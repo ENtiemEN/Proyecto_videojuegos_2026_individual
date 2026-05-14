@@ -62,6 +62,12 @@ class Player:
 
         self.color = (0.0, 0.46, 1.0) # Neon
         self.time_alive = 0
+
+        # Sistema de Puntuación
+        self.score = 0
+        self.is_hunter = False
+        self.hunter_timer = 0
+        self.base_color = (0.0, 0.46, 1.0)
     
     def update(self, keys, width, height, walls):
         self.time_alive += 1
