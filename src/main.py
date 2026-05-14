@@ -390,6 +390,18 @@ def main():
 
         ## lógica del juego
         player.update(keys, MAP_WIDTH, MAP_HEIGHT, walls)
+
+        # Recolección de frutas
+        for fruit in fruits:
+            if fruit.active:
+                dist = math.hypot(player.x - fruit.x, player.y - fruit.y)
+                if dist < (player.r + fruit.r):
+                    fruit.active = False
+                    player.score += 10
+                    print(f"Puntuación: {player.score}")
+
+        
+
         camera.update(player.x, player.y)
 
         # Filtar ondas que ya no están activas
