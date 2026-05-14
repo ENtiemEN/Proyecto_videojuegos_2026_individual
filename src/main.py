@@ -385,7 +385,7 @@ def main():
         Fruit(1050, 970), Fruit(1150, 970), Fruit(1250, 970), # Pasillo superior
         Fruit(250, 250), Fruit(250, 400), Fruit(400, 520)     # Zona Zig-Zag
     ]
-    stars = [Star(1200, 320)] # Escondida en la zona de pilares
+    stars = [Star(1100, 320)] # Escondida en la zona de pilares
     walls = [
         # --- BORDES DEL MAPA (Para que la onda ilumine los límites) ---
         Wall(0, 0, 1600, 40),       # Borde Inferior
@@ -474,6 +474,16 @@ def main():
                     player.hunter_timer = FPS * 10
                     print("MODO CAZA ACTIVADO")
 
+        for enemy in enemies:
+            enemy.update()
+
+            # Condición de derrota
+            # Si el enemigo toca al jugador y el jugador NO es cazador <> Derrota
+            if enemy.active and not player.is_hunter:
+                dist = math.hypot(player.x - enemy.x, player.y - enemy.y)
+                if dist < (player.r + enemy.r):
+                    print("GAME OVER")
+                    running = False # Por ahora cerramos el juego "podríamos agregar un menu u otra idea"
 
         camera.update(player.x, player.y)
 
@@ -514,6 +524,10 @@ def main():
 
         for wave in waves: # dibujamos las ondas antes que el jugador para que quede por encima
             wave.draw()
+
+        for enemy in enemies:
+            enemy.draw(player.is_hunter)
+        
         # Jugador
         player.draw()
 
