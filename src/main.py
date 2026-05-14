@@ -70,6 +70,16 @@ class Player:
         self.base_color = (0.0, 0.46, 1.0)
     
     def update(self, keys, width, height, walls):
+        # Estado de ataque (Power-Up)
+        if self.is_hunter:
+            self.hunter_timer -= 1
+            self.color = (1.0, 1.0, 0.0) # El player se vuelve amarillento
+            if self.hunter_timer <= 0:
+                self.is_hunter = False
+                self.color = self.base_color
+        else:
+            self.color = self.base_color
+
         self.time_alive += 1
 
         # Efecto de pulsación (Variar el radio ligeramente)
