@@ -327,6 +327,11 @@ def main():
 
     # Game loop
     waves = [] # Almacenamos ondas de sonido activas, en caso el usuario haga jitter
+    fruits = [
+        Fruit(1050, 970), Fruit(1150, 970), Fruit(1250, 970), # Pasillo superior
+        Fruit(250, 250), Fruit(250, 400), Fruit(400, 520)     # Zona Zig-Zag
+    ]
+    stars = [Star(1200, 320)] # Escondida en la zona de pilares
     walls = [
         # --- BORDES DEL MAPA (Para que la onda ilumine los límites) ---
         Wall(0, 0, 1600, 40),       # Borde Inferior
