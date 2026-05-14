@@ -598,15 +598,31 @@ def main():
             if enemy.active and not player.is_hunter:
                 dist = math.hypot(player.x - enemy.x, player.y - enemy.y)
                 if dist < (player.r + enemy.r):
-                    print("GAME OVER")
-                    running = False # Por ahora cerramos el juego "podríamos agregar un menu u otra idea"
+                    if player.is_hunter:
+                        enemy.active = False
+                        player.score += 50
+                        print(f"Enemigo eliminado, Puntuación: {player.score}")
+                    else:
+                        print("GAME OVER")
+                        running = False
 
         camera.update(player.x, player.y)
 
         # Filtar ondas que ya no están activas
         for wave in waves:
             wave.update()
+
+            # DETECCIÓN ENEMIGA
+            for enemy in enemies:
+                dist = math.hypot(wave.x - enemy.x, wave.y - enemy.y)
+
+                # Si el borde de la onda toca al enemigo (Con un margen de error)
+                if abs(dist - wave.radius) < 15.0:
+                    enemy.calculate_path(wave.x, wave.y, nav_grid)
+
+        # Filtrar ondas que ya no están activas                    
         waves = [w for w in waves if w.active]
+
         # Actualizar iluminación de paredes
         for wall in walls:
             wall.update(waves)
