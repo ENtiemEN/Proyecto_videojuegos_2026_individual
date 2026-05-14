@@ -276,13 +276,32 @@ class Enemy:
     def __init__(self, x, y):
         self.x = x
         self.y = y
-        self.r = 20
+        self.r = 40
         self.color = (1.0, 0.0, 0.0)
         self.speed = 4.5
 
         # Estados: 'IDLE' (quieto), 'INVESTIGATING' (escuchó sonido), 'FLEEING' (Huyendo del jugador con power-up)
         self.state = 'IDLE'
-        self.target_path = [] # Se guarda la ruta generada por A*
+        self.path = [] # Se guarda la ruta generada por A*
+        self.active = True
+
+    def update(self):
+        if not self.active: return
+        # Lógica para seguir la ruta
+        pass
+
+    def draw(self, is_player_hunter):
+        if not self.active: return
+
+        # Si el jugador tiene estrella, el enemigo huye (Cambia de color)
+        if is_player_hunter:
+            self.color = (1.0, 0.5, 0.0) # Naranja
+        else:
+            self.color = (1.0, 0.0, 0.0) 
+        
+        # Testeamos al enemigo con un circulo
+        draw_circle(self.x, self.y, self.r, self.color)
+
 
 class Camera:
     def __init__(self, width, height, map_width, map_height):
@@ -405,6 +424,16 @@ def main():
         Wall(350, 750, 250, 40),
         Wall(400, 1000, 40, 160),
         Wall(600, 850, 40, 200)
+    ]
+
+    # Generar la matriz de navegación (Solo una vez)
+    nav_grid = create_nav_grid(MAP_WIDTH, MAP_HEIGHT, walls, CELL_SIZE)
+    
+    # Instanciar enemigos
+    enemies = [
+        Enemy(250, 400),   # Zona Zig-Zag
+        Enemy(1200, 320),  # Zona de Pilares
+        Enemy(500, 950)    # Zona Superior
     ]
 
     running = True
