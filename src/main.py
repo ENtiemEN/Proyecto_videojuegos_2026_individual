@@ -642,113 +642,112 @@ def main():
         # Máquina de estados --
         if state == "MENU":
             # Dibujamos menú principal
-            pass
+            draw_text(WIDTH//2 - 200, HEIGHT - 150, "RESONANCE", font_title, color=(0,255,255))
+            c_new = (255,255,0) if menu_idx == 0 else (100,100,100)
+            draw_text(WIDTH//2 - 150, HEIGHT//2, "> Nueva Partida", font_menu, color=c_new)
+
+            c_cont = (255,255,0) if menu_idx == 1 else (100,100,100)
+            if not game_started: c_cont = (40,40,40) # Desactivado
+            draw_text(WIDTH//2 - 150, HEIGHT//2 - 50, "> Continuar", font_menu, color=c_cont)
+
         
         elif state == "GAME_OVER":
-            # se acaba
-            pass
+            draw_text(WIDTH//2 - 200, HEIGHT - 200, "GAME OVER", font_title, color=(255,0,0))
+            draw_text(WIDTH//2 - 150, HEIGHT//2, f"Puntuacion Final: {current_score}", font_menu, (255, 255, 255))
+            draw_text(WIDTH//2 - 150, HEIGHT//2 - 50, f"Max. Historico: {high_score}", font_menu, (0, 255, 0))
+            draw_text(WIDTH//2 - 220, 100, "Presiona ENTER para volver al Menu", font_hud, (150, 150, 150))
         
         elif state == "PLAYING":
-            pass
+            keys = pygame.key.get_pressed()
+            player.update(keys, MAP_WIDTH, MAP_HEIGHT, walls)
+            camera.update(player.x, player.y)
 
-        
-        # Lógica de actualización (Movimiento, Colisiones, etc.)
-        keys = pygame.key.get_pressed()
-
-        ## lógica del juego
-        player.update(keys, MAP_WIDTH, MAP_HEIGHT, walls)
-
-        # Recolección de frutas
-        for fruit in fruits:
-            if fruit.active:
-                dist = math.hypot(player.x - fruit.x, player.y - fruit.y)
-                if dist < (player.r + fruit.r):
+            # Recolección
+            for fruit in fruits:
+                if fruit.active and math.hypot(player.x - fruit.x, player.y - fruit.y) < (player.r + fruit.r):
                     fruit.active = False
                     player.score += 10
-                    print(f"Puntuación: {player.score}")
-        
-        # Recolección de Power-Up (Estrella)
-        for star in stars:
-            if star.active:
-                dist = math.hypot(player.x - star.x, player.y - star.y)
-                if dist < (player.r + star.r):
+            
+            for star in stars:
+                if star.active and math.hypot(player.x - star.x, player.y - star.y) < (player.r + star.r):
                     star.active = False
                     player.is_hunter = True
                     player.hunter_timer = FPS * 10
-                    print("MODO CAZA ACTIVADO")
 
-        for enemy in enemies:
-            enemy.update()
-
-            # Colisión jugador-enemigo
-            if enemy.active:
-                dist = math.hypot(player.x - enemy.x, player.y - enemy.y)
-                if dist < (player.r + enemy.r):
-                    if player.is_hunter:
-                        enemy.active = False
-                        player.score += 50
-                        print(f"Enemigo eliminado, Puntuación: {player.score}")
-                    else:
-                        print("GAME OVER")
-                        running = False
-
-        camera.update(player.x, player.y)
-
-        # Filtar ondas que ya no están activas
-        for wave in waves:
-            wave.update()
-
-            # DETECCIÓN ENEMIGA
+            # Enemigos
             for enemy in enemies:
-                dist = math.hypot(wave.x - enemy.x, wave.y - enemy.y)
+                enemy.update()
+                # Colisión jugador-enemigo
+                if enemy.active:
+                    dist = math.hypot(player.x - enemy.x, player.y - enemy.y)
+                    if dist < (player.r + enemy.r):
+                        if player.is_hunter:
+                            enemy.active = False
+                            player.score += 50
+                        else:
+                            # Muerte del jugador
+                            current_score = player.score
+                            if current_score > high_score:
+                                high_score = current_score
+                            game_started = False
+                            menu_idx = 0
+                            state = "GAME_OVER"
+                
+            # Onda y Ecolocalización
+            # Filtar ondas que ya no están activas
+            for wave in waves:
+                wave.update()
 
-                # Si el borde de la onda toca al enemigo (Con un margen de error)
-                if abs(dist - wave.radius) < 15.0:
-                    enemy.calculate_path(wave.x, wave.y, nav_grid)
+                # DETECCIÓN ENEMIGA
+                for enemy in enemies:
+                    dist = math.hypot(wave.x - enemy.x, wave.y - enemy.y)
 
-        # Filtrar ondas que ya no están activas                    
-        waves = [w for w in waves if w.active]
+                    # Si el borde de la onda toca al enemigo (Con un margen de error)
+                    if abs(dist - wave.radius) < 15.0:
+                        enemy.calculate_path(wave.x, wave.y, nav_grid)
 
-        # Actualizar iluminación de paredes
-        for wall in walls:
-            wall.update(waves)
-
-        # Renderizado
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
-
-        # Aplicar el desplazamiento de la cámara antes de dibujar
-        camera.apply()
-
-        draw_grid(MAP_WIDTH, MAP_HEIGHT)
-
-        glColor3f(0.15, 0.15, 0.15)
-        glBegin(GL_LINE_LOOP)
-        glVertex2f(0,0)
-        glVertex2f(MAP_WIDTH, 0)
-        glVertex2f(MAP_WIDTH, MAP_HEIGHT)
-        glVertex2f(0, MAP_HEIGHT)
-        glEnd()
-
-        # Dibujar los obstaculos (con la iluminación)
-        for wall in walls:
-            wall.draw()
+            # Filtrar ondas que ya no están activas                    
+            waves = [w for w in waves if w.active]
+            for wall in walls: wall.update(waves)
         
-        # Dibujamos los objeto recolectables
-        for fruit in fruits:
-            fruit.draw()
+            # Rederizado del Nivel
+            # Aplicar el desplazamiento de la cámara antes de dibujar
+            camera.apply()
 
-        for star in stars:
-            star.draw()
+            draw_grid(MAP_WIDTH, MAP_HEIGHT)
+            glColor3f(0.15, 0.15, 0.15)
+            glBegin(GL_LINE_LOOP)
+            glVertex2f(0,0)
+            glVertex2f(MAP_WIDTH, 0)
+            glVertex2f(MAP_WIDTH, MAP_HEIGHT)
+            glVertex2f(0, MAP_HEIGHT)
+            glEnd()
 
-        for wave in waves: # dibujamos las ondas antes que el jugador para que quede por encima
-            wave.draw()
+            # Dibujar los obstaculos (con la iluminación)
+            for wall in walls:
+                wall.draw()
+            
+            # Dibujamos los objeto recolectables
+            for fruit in fruits:
+                fruit.draw()
 
-        for enemy in enemies:
-            enemy.draw(player.is_hunter)
-        
-        # Jugador
-        player.draw()
+            for star in stars:
+                star.draw()
 
+            for wave in waves: # dibujamos las ondas antes que el jugador para que quede por encima
+                wave.draw()
+
+            for enemy in enemies:
+                enemy.draw(player.is_hunter)
+            
+            # Jugador
+            player.draw()
+
+            # Renderizado del HUD (Interfaz fija)
+            draw_text(20, HEIGHT - 40, f"SCORE: {player.score}",font_hud, color=(0,255,0))
+            if player.is_hunter:
+                draw_text(WIDTH//2 - 60, HEIGHT - 40, "MODO CAZADOR", font_hud, (255,255,0))
+   
         # Intercambiar los buffers para mostrar lo que se ha dibujado
         pygame.display.flip()
 
