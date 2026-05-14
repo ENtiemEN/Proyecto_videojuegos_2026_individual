@@ -378,8 +378,24 @@ class Enemy:
 
     def update(self):
         if not self.active: return
-        # Lógica para seguir la ruta
-        pass
+        # Si tenemos una ruta, nos movemos hacia el primer punto de la lista
+        if len(self.path) > 0:
+            target_x, target_y = self.path[0]
+
+            # Dirección hacia el objetivo (vector de dirección)
+            dx = target_x - self.x
+            dy = target_y - self.y
+            dist = math.hypot(dx, dy)
+
+            # Si llegamos a ese punto (o estamos muy cerca), lo sacamos de la lista
+            if dist < self.speed:
+                self.x = target_x
+                self.y = target_y
+                self.path.pop(0)
+            else:
+                # Nomalizar el vector y multiplicarlo por la velocidad
+                self.x += (dx / dist) * self.speed
+                self.y += (dy / dist) * self.speed
 
     def draw(self, is_player_hunter):
         if not self.active: return
@@ -392,6 +408,15 @@ class Enemy:
         
         # Testeamos al enemigo con un circulo
         draw_circle(self.x, self.y, self.r, self.color)
+
+        # DEBUG --> Dibujamos una línea roja para ver la ruta que planeó A*
+        if len(self.path) > 0:
+            glColor3f(1.0, 0.0, 0.0)
+            glBegin(GL_LINE_STRIP)
+            glVertex2f(self.x, self.y)
+            for px, py in self.path:
+                glVertex2f(px, py)
+            glEnd()
 
 
 class Camera:
