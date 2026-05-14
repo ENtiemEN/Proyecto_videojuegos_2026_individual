@@ -11,6 +11,35 @@ WIDTH, HEIGHT = 800, 600
 CELL_SIZE = 40 # Tamaño de cada celda de navegación
 FPS = 60
 
+# Función de dibujo
+def draw_text(x,y, text, font, color=(255,255,255)):
+    """Renderiza texto de Pygame y lo dibuja en el contexto de OpenGL como píxeles 2D"""
+    text_surface = font.render(text, True, color)
+    # Pygame dibuja de arriba a abajo, OpenGL de abajo a arriba (Flip = True)
+    text_data = pygame.image.tostring(text_surface, "RGBA", True)
+
+    glMatrixMode(GL_PROJECTION)
+    glPushMatrix()
+    glLoadIdentity()
+    gluOrtho2D(0, WIDTH, 0, HEIGHT)
+
+    glMatrixMode(GL_MODELVIEW)
+    glPushMatrix()
+    glLoadIdentity()
+
+    # Posicionar el texto
+    glRasterPos2f(x, y)
+    glEnable(GL_BLEND)
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+    glDrawPixels(text_surface.get_width(), text_surface.get_height(), GL_RGBA, GL_UNSIGNED_BYTE, text_data)
+    glDisable(GL_BLEND)
+
+    # Restauramos las matrices originales
+    glPopMatrix()
+    glMatrixMode(GL_PROJECTION)
+    glPopMatrix()
+    glMatrixMode(GL_MODELVIEW)
+
 def draw_grid(map_width, map_height, step=100):
     glColor3f(0.06, 0.06, 0.06)
     glBegin(GL_LINES)
@@ -484,7 +513,7 @@ def main():
     pygame.init()
     display_flags = DOUBLEBUF | OPENGL
     pygame.display.set_mode((WIDTH,HEIGHT), display_flags)
-    pygame.display.set_caption("Resonance - Entregable 2")
+    pygame.display.set_caption("Resonance - Entregable 3")
 
     init_opengl()
     clock = pygame.time.Clock()
