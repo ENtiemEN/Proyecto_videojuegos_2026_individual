@@ -271,6 +271,17 @@ class Star:
         glVertex2f(self.x - self.r, self.y + self.r/2)
         glEnd()
 
+class Enemy:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+        self.r = 20
+        self.color = (1.0, 0.0, 0.0)
+        self.speed = 4.5
+
+        # Estados: 'IDLE' (quieto), 'INVESTIGATING' (escuchó sonido), 'FLEEING' (Huyendo del jugador con power-up)
+        self.state = 'IDLE'
+        self.target_path = [] # Se guarda la ruta generada por A*
 
 class Camera:
     def __init__(self, width, height, map_width, map_height):
