@@ -351,8 +351,30 @@ class Enemy:
 
         # Estados: 'IDLE' (quieto), 'INVESTIGATING' (escuchó sonido), 'FLEEING' (Huyendo del jugador con power-up)
         self.state = 'IDLE'
-        self.path = [] # Se guarda la ruta generada por A*
+        self.path = [] # Guarda puntos (X,Y) en píxeles
         self.active = True
+
+    def calculate_path(self, target_x, target_y, grid):
+        """Convierte coordenadas a índices, corre A* y guarda la ruta en píxeles"""
+        # Discretizar --> Convertir píxeles a índices de celda
+        start_col = int(self.x // CELL_SIZE)
+        start_row = int(self.y // CELL_SIZE)
+
+        goal_col = int(target_x // CELL_SIZE)
+        goal_row = int(target_y // CELL_SIZE)
+
+        start_node = (start_col, start_row)
+        goal_node = (goal_col, goal_row)
+
+        # Ejecutamos A*
+        grid_path = a_star_search(grid, start_node, goal_node)
+
+        # Covertimos a píxeles nuevamente
+        self.path = []
+        for col, row in grid_path:
+            px_x = (col * CELL_SIZE) + (CELL_SIZE / 2)
+            px_y = (row * CELL_SIZE) + (CELL_SIZE / 2)
+            self.path.append((px_x, px_y))
 
     def update(self):
         if not self.active: return
