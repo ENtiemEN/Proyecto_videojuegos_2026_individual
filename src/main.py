@@ -13,25 +13,31 @@ FPS = 60
 
 # Función de dibujo
 def draw_text(x,y, text, font, color=(255,255,255)):
-    """Renderiza texto de Pygame y lo dibuja en el contexto de OpenGL como píxeles 2D"""
+    """Renderiza texto de Pygame y lo dibuja en el contexto de OpenGL como píxeles 2D (i.e. Pygame renderiza -> OpenGL muestra)"""
     text_surface = font.render(text, True, color)
-    # Pygame dibuja de arriba a abajo, OpenGL de abajo a arriba (Flip = True)
+    # Pygame dibuja de arriba a abajo, OpenGL de abajo a arriba
     text_data = pygame.image.tostring(text_surface, "RGBA", True)
 
     glMatrixMode(GL_PROJECTION)
+    glPushMatrix() # Guardamos la matriz en un stack
+    glLoadIdentity()
+    gluOrtho2D(0, WIDTH, 0, HEIGHT) # izq=0, derecha=WIDTH, abajo=0, arriba=HEIGHT
+
+
+    glMatrixMode(GL_MODELVIEW) # Controla -> posición, rotación,escala
     glPushMatrix()
     glLoadIdentity()
-    gluOrtho2D(0, WIDTH, 0, HEIGHT)
 
-    glMatrixMode(GL_MODELVIEW)
-    glPushMatrix()
-    glLoadIdentity()
-
-    # Posicionar el texto
-    glRasterPos2f(x, y)
-    glEnable(GL_BLEND)
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
-    glDrawPixels(text_surface.get_width(), text_surface.get_height(), GL_RGBA, GL_UNSIGNED_BYTE, text_data)
+    glRasterPos2f(x, y) # Define dónde OpenGL empezará a dibujar píxeles
+    glEnable(GL_BLEND) # Activamos blending, para manejar transparencia
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA) # Fórmula para alpha blending
+    glDrawPixels(
+        text_surface.get_width(),
+        text_surface.get_height(),
+        GL_RGBA,
+        GL_UNSIGNED_BYTE,
+        text_data
+    ) # OpenGL dibuja los bytes con los parámetros -> (ancho, alto, formato de color, tipo de dato, buffer de píxeles)
     glDisable(GL_BLEND)
 
     # Restauramos las matrices originales
@@ -511,12 +517,19 @@ def create_nav_grid(map_w, map_h, walls, cell_size):
 
 def main():
     pygame.init()
+    pygame.font.init()
+
     display_flags = DOUBLEBUF | OPENGL
     pygame.display.set_mode((WIDTH,HEIGHT), display_flags)
     pygame.display.set_caption("Resonance - Entregable 3")
 
     init_opengl()
     clock = pygame.time.Clock()
+
+    # Fuentes para el HUD (Head-Up Display) y menú
+    font_title = pygame.font.SysFont("Courier", 72, bold=True)
+    font_menu = pygame.font.SysFont("Courier", 36, bold=True)
+    font_hud = pygame.font.SysFont("Arial", 24, bold=True)
 
     # Definimos un mapa 2 veces más grande que la ventana
     MAP_WIDTH, MAP_HEIGHT = 1600, 1200
@@ -525,12 +538,7 @@ def main():
     camera = Camera(WIDTH, HEIGHT, MAP_WIDTH, MAP_HEIGHT)
 
     # Game loop
-    waves = [] # Almacenamos ondas de sonido activas, en caso el usuario haga jitter
-    fruits = [
-        Fruit(1050, 970), Fruit(1150, 970), Fruit(1250, 970), # Pasillo superior
-        Fruit(250, 250), Fruit(250, 400), Fruit(400, 520)     # Zona Zig-Zag
-    ]
-    stars = [Star(1100, 320)] # Escondida en la zona de pilares
+
     walls = [
         # --- BORDES DEL MAPA (Para que la onda ilumine los límites) ---
         Wall(0, 0, 1600, 40),       # Borde Inferior
@@ -573,13 +581,31 @@ def main():
 
     # Generar la matriz de navegación (Solo una vez)
     nav_grid = create_nav_grid(MAP_WIDTH, MAP_HEIGHT, walls, CELL_SIZE)
+
+    # VARIABLES GLOBALES DEL JUEGO
+    state = "MENU" # Estados posibles --> "MENU", "PLAYING", "GAME_OVER"
+    menu_idx = 0 # 0: Nueva partida, 1: Continuar
+    high_score = 0
+    current_score = 0
+    game_started = False # saber si Botón "Continuar" es válido o no
     
-    # Instanciar enemigos
-    enemies = [
-        Enemy(250, 400),   # Zona Zig-Zag
-        Enemy(1200, 320),  # Zona de Pilares
-        Enemy(500, 950)    # Zona Superior
-    ]
+    # VARIABLES SESIÓN ACTUAL
+    player = None
+    camera = None
+    waves = []
+    fruits = []
+    stars = []
+    enemies = []
+
+    def reset_game():
+        nonlocal player, camera, waves, fruits, stars, enemies
+        player = Player(MAP_WIDTH//2,MAP_HEIGHT//2)
+        camera = Camera(WIDTH, HEIGHT, MAP_WIDTH, MAP_HEIGHT)
+        waves = []
+        fruits = [Fruit(1050, 970), Fruit(1150, 970), Fruit(1250, 970), Fruit(250, 250), Fruit(250, 400), Fruit(400, 520)]
+        stars = [Star(1100, 320)]
+        enemies = [Enemy(250, 400), Enemy(1200, 320), Enemy(500, 950)]
+        for wall in walls: wall.brightness = 0.0
 
     running = True
 
@@ -588,11 +614,43 @@ def main():
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
+
             elif event.type == KEYDOWN:
-                if event.key == K_ESCAPE:
-                    running = False
-                elif event.key == K_SPACE:
-                    waves.append(SoundWave(player.x, player.y))
+                if state == "PLAYING":
+                    if event.key == K_ESCAPE:
+                        state = "MENU"
+                    elif event.key == K_SPACE:
+                        waves.append(SoundWave(player.x, player.y))
+                
+                elif state == "MENU":
+                    if event.key == K_UP or event.key == K_DOWN:
+                        menu_idx = 1 - menu_idx # Alternamos entre 0 y 1
+                    elif event.key == K_RETURN:
+                        if menu_idx == 0: # New game
+                            reset_game()
+                            game_started = True
+                            state = "PLAYING"
+                        elif menu_idx == 1 and game_started: # Continue
+                            state = "PLAYING"
+                
+                elif state == "GAME_OVER":
+                    if event.key == K_RETURN:
+                        state = "MENU"
+        
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+
+        # Máquina de estados --
+        if state == "MENU":
+            # Dibujamos menú principal
+            pass
+        
+        elif state == "GAME_OVER":
+            # se acaba
+            pass
+        
+        elif state == "PLAYING":
+            pass
+
         
         # Lógica de actualización (Movimiento, Colisiones, etc.)
         keys = pygame.key.get_pressed()
