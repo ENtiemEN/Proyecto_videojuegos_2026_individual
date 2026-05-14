@@ -593,9 +593,8 @@ def main():
         for enemy in enemies:
             enemy.update()
 
-            # Condición de derrota
-            # Si el enemigo toca al jugador y el jugador NO es cazador <> Derrota
-            if enemy.active and not player.is_hunter:
+            # Colisión jugador-enemigo
+            if enemy.active:
                 dist = math.hypot(player.x - enemy.x, player.y - enemy.y)
                 if dist < (player.r + enemy.r):
                     if player.is_hunter:
