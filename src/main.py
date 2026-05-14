@@ -7,6 +7,7 @@ import math
 
 # Global Config
 WIDTH, HEIGHT = 800, 600
+CELL_SIZE = 40 # Tamaño de cada celda de navegación
 FPS = 60
 
 def draw_grid(map_width, map_height, step=100):
@@ -320,6 +321,29 @@ def init_opengl():
     glLoadIdentity()
 
     glClearColor(0.02, 0.02, 0.02, 1.0) # -> Fondo
+
+def create_nav_grid(map_w, map_h, walls, cell_size):
+    """Convierte el mapa continuo en una matriz discreta de 0 y 1s para navegación | algoritmos"""
+    cols = map_w // cell_size
+    rows = map_h // cell_size
+
+    # Matriz bidimensional inicializada en 0 (celdas transitables)
+    grid = [[0 for _ in range(cols)] for _ in range(rows)]
+
+    for r in range(rows):
+        for c in range(cols):
+            # Coordenadas reales de la celda
+            cell_x = c * cell_size
+            cell_y = r * cell_size
+
+            # Comprobar si la celda choca con alguna pared
+            for wall in walls:
+                # Si hay intersección entre la celda y la pared, se marca como no transitable (1)
+                if (cell_x < wall.x + wall.w and cell_x + cell_size > wall.x and
+                    cell_y < wall.y + wall.h and cell_y + cell_size > wall.y):
+                    grid[r][c] = 1
+                    break
+    return grid
 
 def main():
     pygame.init()
