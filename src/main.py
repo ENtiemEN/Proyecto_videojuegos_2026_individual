@@ -4,6 +4,7 @@ from OpenGL.GL import * # -> Funciones core de OpenGL
 from OpenGL.GLU import * # -> Funciones auxiliares de alto nivel e.g. `gluOrtho2D`
 import sys
 import math
+import heapq
 
 # Global Config
 WIDTH, HEIGHT = 800, 600
@@ -271,6 +272,74 @@ class Star:
         glVertex2f(self.x - self.r, self.y - self.r/2)
         glVertex2f(self.x - self.r, self.y + self.r/2)
         glEnd()
+
+def heuristic(a, b):
+    """Calcula la distancia Euclidiana (línea recta) entre dos puntos en la cuadrícula"""
+    return math.hypot(a[0] - b[0], a[1], b[1])
+
+def a_star_search(grid, start, goal):
+    """
+    grid: Matriz de 0 y 1's
+    start: Tupla (col, fila) de inicio
+    goal: Tupla (col, fila) de destino
+    Retorna --> Lista de tuplas [(col, fila), ...] formando la ruta, o [] si no hay.
+    """
+    rows = len(grid)
+    cols = len(grid[0])
+
+    # Cola de prioridad para el Open Set. Guarda tuplas: (f_score, (col, fila))
+    ## Open Set   --> Nosdos descubiertos que aún no han sido evaluados
+    ## Closed Set --> Nodos que ya fueron evaluados por completo, para no volver a caminar sobre nuestro propios pasos
+    open_set = []
+    heapq.heappush(open_set, (0, start))
+
+    # Diccionario para reconstruir el camino
+    came_from = {}
+
+    # Costo desde el inicio
+    g_score = {start: 0}
+
+    # 8 posibles direcciones de movimiento (4+4): Arriba, Abajo, Izquierda, Derecha + Diagonales
+    directions = [(0,1), (0,-1), (1,0), (-1,0), (1,1), (1,-1), (-1,1), (-1,-1)]
+
+    while open_set:
+        # Extraemos el nodo con el menor f(n)
+        current_f, current = heapq.heappop(open_set)
+
+        # Si llegamos al destido/objetivo, reconstruimos el camino hacia atrás
+        if current == goal:
+            path = []
+            while current in came_from:
+                path.append(current)
+                current = came_from[current]
+            path.reverse()
+            return path
+        # Explorar vecinos
+        for dx, dy in directions:
+            neighbor_col = current[0] + dx
+            neighbor_row = current[1] + dy
+
+            # Verificar que el vecino esté dentro de los límites de la matriz/grid
+            if 0 <= neighbor_col < cols and 0 <= neighbor_row < rows:
+                # Verificar que no sea una pared (1)
+                if grid[neighbor_row][neighbor_col] == 1:
+                    continue
+
+                # Costo para moverse en diagonal es mayor (\sqrt{2}) que en línea recta (1)
+                move_cost = math.hypot(dx, dy)
+                tentative_g = g_score[current] + move_cost
+                neighbor = (neighbor_col, neighbor_row)
+
+                # Si encontramos un camino más corto hacia el vecino, lo registramooos
+                if neighbor not in g_score or tentative_g < g_score[neighbor]:
+                    came_from[neighbor] = current
+                    g_score[neighbor] = tentative_g
+
+                    # f(n) = g(n) + h(n)
+                    f_score = tentative_g + heuristic(neighbor, goal)
+                    heapq.heappush(open_set, (f_score, neighbor))
+
+    return [] # Si termina el while y no returnamos, no hay camino posible
 
 class Enemy:
     def __init__(self, x, y):
