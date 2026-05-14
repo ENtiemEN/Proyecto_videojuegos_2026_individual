@@ -217,6 +217,44 @@ class Wall:
 
             glLineWidth(1.0) # Reset al grosor
 
+class Fruit:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+        self.r = 8
+        self.color = (0.0, 1.0, 0.0)
+        self.active = True
+
+    def draw(self):
+        if not self.active: return
+        glColor3f(*self.color)
+        glBegin(GL_POLYGON)
+        glVertex2f(self.x, self.y + self.r)
+        glVertex2f(self.x + self.r, self.y)
+        glVertex2f(self.x, self.y - self.r)
+        glVertex2f(self.x - self.r, self.y)
+        glEnd()
+
+class Star:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+        self.r = 12
+        self.color = (1.0, 1.0, 0.0)
+        self.active = True
+    
+    def draw(self):
+        if not self.active: return
+        glColor3f(*self.color)
+        glBegin(GL_POLYGON)
+        glVertex2f(self.x, self.y + self.r)
+        glVertex2f(self.x + self.r, self.y + self.r/2)
+        glVertex2f(self.x + self.r, self.y - self.r/2)
+        glVertex2f(self.x, self.y - self.r)
+        glVertex2f(self.x - self.r, self.y - self.r/2)
+        glVertex2f(self.x - self.r, self.y + self.r/2)
+        glEnd()
+
 
 class Camera:
     def __init__(self, width, height, map_width, map_height):
