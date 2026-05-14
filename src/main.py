@@ -399,8 +399,17 @@ def main():
                     fruit.active = False
                     player.score += 10
                     print(f"Puntuación: {player.score}")
-
         
+        # Recolección de Power-Up (Estrella)
+        for star in stars:
+            if star.active:
+                dist = math.hypot(player.x - star.x, player.y - star.y)
+                if dist < (player.r + star.r):
+                    star.active = False
+                    player.is_hunter = True
+                    player.hunter_timer = FPS * 10
+                    print("MODO CAZA ACTIVADO")
+
 
         camera.update(player.x, player.y)
 
@@ -431,6 +440,13 @@ def main():
         # Dibujar los obstaculos (con la iluminación)
         for wall in walls:
             wall.draw()
+        
+        # Dibujamos los objeto recolectables
+        for fruit in fruits:
+            fruit.draw()
+
+        for star in stars:
+            star.draw()
 
         for wave in waves: # dibujamos las ondas antes que el jugador para que quede por encima
             wave.draw()
