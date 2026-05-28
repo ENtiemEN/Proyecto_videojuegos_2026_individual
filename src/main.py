@@ -4,6 +4,7 @@ from OpenGL.GL import *
 from OpenGL.GLU import *
 import sys
 import math
+import random
 
 from entities import Player, SoundWave, Wall, Fruit, Star, Enemy, Camera, Exit, CELL_SIZE
 from levels import get_level, MAX_LEVEL
@@ -107,18 +108,22 @@ def main():
     current_level = 1
 
     # VARIABLES SESIÓN ACTUAL
-    player   = None
-    camera   = None
-    waves    = []
-    fruits   = []
-    stars    = []
-    enemies  = []
-    walls    = []
-    nav_grid = []
-    exit_obj = None
+    player              = None
+    camera              = None
+    waves               = []
+    fruits              = []
+    stars               = []
+    enemies             = []
+    walls               = []
+    nav_grid            = []
+    exit_obj            = None
+    survival_mode       = False
+    enemy_spawn_timer    = 0
+    enemy_spawn_interval = 0
 
     def reset_game():
         nonlocal player, camera, waves, fruits, stars, enemies, walls, nav_grid, exit_obj
+        nonlocal survival_mode, enemy_spawn_timer, enemy_spawn_interval
         data     = get_level(current_level)
         walls    = data['walls']
         fruits   = data['fruits']
@@ -130,6 +135,9 @@ def main():
         camera   = Camera(WIDTH, HEIGHT, MAP_WIDTH, MAP_HEIGHT)
         waves    = []
         nav_grid = create_nav_grid(MAP_WIDTH, MAP_HEIGHT, walls, CELL_SIZE)
+        survival_mode = data.get('survival', False)
+        enemy_spawn_interval = 1200 if survival_mode else 0
+        enemy_spawn_timer    = enemy_spawn_interval
 
     running = True
 
@@ -200,11 +208,14 @@ def main():
             player.update(keys, MAP_WIDTH, MAP_HEIGHT, walls)
             camera.update(player.x, player.y)
 
-            # Recolección
+            # Recolección y reaparición de frutas
             for fruit in fruits:
                 if fruit.active and math.hypot(player.x - fruit.x, player.y - fruit.y) < (player.r + fruit.r):
                     fruit.active = False
                     player.score += 10
+                    if fruit.respawn_delay > 0:
+                        fruit.respawn_timer = fruit.respawn_delay
+                fruit.update()
 
             for star in stars:
                 if star.active and math.hypot(player.x - star.x, player.y - star.y) < (player.r + star.r):
