@@ -1,47 +1,44 @@
-import pygame # -> ventana, inputs, loop del juego
-from pygame.locals import * # -> CONSTANTES e.g. DOUBLEBUF(double buffer - evitar flickering), OPENGL(contexto OpenGL)
-from OpenGL.GL import * # -> Funciones core de OpenGL
-from OpenGL.GLU import * # -> Funciones auxiliares de alto nivel e.g. `gluOrtho2D`
+import pygame
+from pygame.locals import *
+from OpenGL.GL import *
+from OpenGL.GLU import *
 import sys
 import math
-import heapq
-import random
+
+from entities import Player, SoundWave, Wall, Fruit, Star, Enemy, Camera, CELL_SIZE
+from levels import get_level
 
 # Global Config
 WIDTH, HEIGHT = 800, 600
-CELL_SIZE = 40 # Tamaño de cada celda de navegación
 FPS = 60
 
-# Función de dibujo
-def draw_text(x,y, text, font, color=(255,255,255)):
-    """Renderiza texto de Pygame y lo dibuja en el contexto de OpenGL como píxeles 2D (i.e. Pygame renderiza -> OpenGL muestra)"""
+def draw_text(x, y, text, font, color=(255, 255, 255)):
+    """Renderiza texto de Pygame y lo dibuja en el contexto de OpenGL como píxeles 2D"""
     text_surface = font.render(text, True, color)
     # Pygame dibuja de arriba a abajo, OpenGL de abajo a arriba
     text_data = pygame.image.tostring(text_surface, "RGBA", True)
 
     glMatrixMode(GL_PROJECTION)
-    glPushMatrix() # Guardamos la matriz en un stack
+    glPushMatrix()
     glLoadIdentity()
-    gluOrtho2D(0, WIDTH, 0, HEIGHT) # izq=0, derecha=WIDTH, abajo=0, arriba=HEIGHT
+    gluOrtho2D(0, WIDTH, 0, HEIGHT)
 
-
-    glMatrixMode(GL_MODELVIEW) # Controla -> posición, rotación,escala
+    glMatrixMode(GL_MODELVIEW)
     glPushMatrix()
     glLoadIdentity()
 
-    glRasterPos2f(x, y) # Define dónde OpenGL empezará a dibujar píxeles
-    glEnable(GL_BLEND) # Activamos blending, para manejar transparencia
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA) # Fórmula para alpha blending
+    glRasterPos2f(x, y)
+    glEnable(GL_BLEND)
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
     glDrawPixels(
         text_surface.get_width(),
         text_surface.get_height(),
         GL_RGBA,
         GL_UNSIGNED_BYTE,
         text_data
-    ) # OpenGL dibuja los bytes con los parámetros -> (ancho, alto, formato de color, tipo de dato, buffer de píxeles)
+    )
     glDisable(GL_BLEND)
 
-    # Restauramos las matrices originales
     glPopMatrix()
     glMatrixMode(GL_PROJECTION)
     glPopMatrix()
@@ -58,500 +55,28 @@ def draw_grid(map_width, map_height, step=100):
         glVertex2f(map_width, y)
     glEnd()
 
-def draw_circle(x,y,r, color, segments=32):
-    """Dibuja un círculo aproximado con polígonos"""
-    glColor3f(*color)
-    glBegin(GL_TRIANGLE_FAN)
-    glVertex2f(x,y)
-
-    for i in range(segments + 1):
-        angle = i * (2.0 * math.pi / segments)
-        cx = x + r * math.cos(angle)
-        cy = y + r * math.sin(angle)
-        glVertex2f(cx,cy)
-    glEnd()
-
-def draw_empty_circle(x,y,r,color,line_width=2.0,segments=64):
-    """Dibujamos anillos (representando las ondas)"""
-    glLineWidth(line_width)
-    glColor3f(*color)
-    glBegin(GL_LINE_LOOP)
-    for i in range(segments):
-        angle = i * (2.0 * math.pi / segments)
-        cx = x + r * math.cos(angle)
-        cy = y + r * math.sin(angle)
-        glVertex2f(cx,cy)
-    glEnd()
-    glLineWidth(1.0) # Reset al grosor
-
-class Player:
-    def __init__(self, x, y):
-        self.x = x
-        self.y = y
-        self.base_r = 24
-        self.r = 24
-
-        # Física de mov.
-        self.vx = 0.0
-        self.vy = 0.0
-        self.max_speed = 8.0
-        self.acceleration = 1.2
-        self.friction = 0.92
-
-        self.color = (0.0, 0.46, 1.0) # Neon
-        self.time_alive = 0
-
-        # Sistema de Puntuación
-        self.score = 0
-        self.is_hunter = False
-        self.hunter_timer = 0
-        self.base_color = (0.0, 0.46, 1.0)
-    
-    def update(self, keys, width, height, walls):
-        # Estado de ataque (Power-Up)
-        if self.is_hunter:
-            self.hunter_timer -= 1
-            self.color = (1.0, 1.0, 0.0) # El player se vuelve amarillento
-            if self.hunter_timer <= 0:
-                self.is_hunter = False
-                self.color = self.base_color
-        else:
-            self.color = self.base_color
-
-        self.time_alive += 1
-
-        # Efecto de pulsación (Variar el radio ligeramente)
-        self.r = self.base_r + math.sin(self.time_alive * 0.1) * 0.8
-
-        # Físicas (Aceleración)
-        # (W,A,S,D o ↑, ↓, →, ←)
-        if keys[K_w] or keys[K_UP]:
-            self.vy += self.acceleration
-        if keys[K_s] or keys[K_DOWN]:
-            self.vy -= self.acceleration
-        if keys[K_a] or keys[K_LEFT]:
-            self.vx -= self.acceleration
-        if keys[K_d] or keys[K_RIGHT]:
-            self.vx += self.acceleration
-
-        # Físicas (Fricción, Límite de Vel.)
-        self.vx *= self.friction
-        self.vy *= self.friction
-
-        speed = math.hypot(self.vx, self.vy)
-        if speed > self.max_speed:
-            ratio = self.max_speed / speed
-            self.vx *= ratio
-            self.vy *= ratio
-
-        # COLISIONES
-        # Mover en X, y comprobar colisiones
-        self.x += self.vx
-        for wall in walls:
-            if self.check_collision(wall):
-                if self.vx > 0: # Si se movía a la der., lo empujamos a la izq.
-                    self.x = wall.x - self.base_r
-                elif self.vx < 0: # Si se movía a la izq., lo empujamos a la der.
-                    self.x = wall.x + wall.w + self.base_r
-                self.vx = 0 # Detener el momento en X
-
-        # Mover en Y, y comprobar colisiones
-        self.y += self.vy
-        for wall in walls:
-            if self.check_collision(wall):
-                if self.vy > 0: # Si se movía hacia arriba, lo empujamos hacia abajo
-                    self.y = wall.y - self.base_r
-                elif self.vy < 0: # Si se movía hacia abajo, lo empujamos hacia arriba
-                    self.y = wall.y + wall.h + self.base_r
-                self.vy = 0 # Detener el momento en Y
-
-        # Detección de bordes del mapa (usa base_r fijo, rebote suave)
-        if self.x - self.base_r < 0:
-            self.x = self.base_r
-            self.vx *= -0.4
-        if self.x + self.base_r > width:
-            self.x = width - self.base_r
-            self.vx *= -0.4
-        if self.y - self.base_r < 0:
-            self.y = self.base_r
-            self.vy *= -0.4
-        if self.y + self.base_r > height:
-            self.y = height - self.base_r
-            self.vy *= -0.4
-    
-    def draw(self):
-        draw_circle(self.x, self.y, self.r, self.color)
-
-    def check_collision(self, wall):
-        """Verificar colisión entre el player y pared"""
-        closest_x = max(wall.x, min(self.x, wall.x + wall.w))
-        closest_y = max(wall.y, min(self.y, wall.y + wall.h))
-
-        distance_x = self.x - closest_x
-        distance_y = self.y - closest_y
-
-        distance_squared = distance_x**2 + distance_y**2
-
-        return distance_squared < (self.base_r ** 2)
-
-class SoundWave:
-    def __init__(self, x, y):
-        self.x = x
-        self.y = y
-        self.radius = 24.0 # Nace del mismo tamaño que el player
-        self.max_radius = 500.0
-        self.expansion_speed = 12.0
-        self.active = True
-        self.base_color = (0.0, 1.0, 1.0)
-
-    def update(self):
-        self.radius += self.expansion_speed
-        if self.radius > self.max_radius:
-            self.active = False
-
-    def draw(self):
-        # Efecto de desvanecimiento
-        intensity = 1.0 - (self.radius / self.max_radius)
-        intensity = max(0.0, intensity) # evitar negativos, just in case
-
-        current_color = (
-            self.base_color[0] * intensity,
-            self.base_color[1] * intensity,
-            self.base_color[2] * intensity,
-        )
-        draw_empty_circle(self.x, self.y, self.radius, current_color)
-
-class Wall:
-    def __init__(self, x, y, w, h):
-        self.x = x
-        self.y = y
-        self.w = w
-        self.h = h
-
-        self.brightness = 0.0
-        self.base_color = (0.0, 1.0, 1.0) # Otro Cyan por ahora (cambiar probablemente)
-
-    def update(self, waves):
-        if self.brightness > 0:
-            self.brightness -= 0.015 # velocidad a la que vuelve la oscuridad
-            self.brightness = max(0.0, self.brightness)
-
-        # Colisión con el borde de las ondas
-        for wave in waves:
-            # encontrar punto más cercano de la pared al centro de la onda
-            closest_x = max(self.x, min(wave.x, self.x + self.w))
-            closest_y = max(self.y, min(wave.y, self.y + self.h))
-
-            # distancia del punto más cercano al centro de la onda
-            distance_x = wave.x - closest_x
-            distance_y = wave.y - closest_y
-            distance = math.hypot(distance_x, distance_y)
-
-            # damos un grosor virtual para que la colisión no sea estricta
-            thickness = 15.0
-            if abs(distance - wave.radius) < thickness:
-                self.brightness = 1.0
-    
-    def draw(self):
-        # Solo se dibuja la pared si el sonido la ha iluminado
-        if self.brightness > 0:
-            current_color = (
-                self.base_color[0] * self.brightness,
-                self.base_color[1] * self.brightness,
-                self.base_color[2] * self.brightness,
-            )
-            glColor3f(*current_color)
-            glLineWidth(2.0)
-            glBegin(GL_LINE_LOOP)
-            glVertex2f(self.x, self.y)
-            glVertex2f(self.x + self.w, self.y)
-            glVertex2f(self.x + self.w, self.y + self.h)
-            glVertex2f(self.x, self.y + self.h)
-            glEnd()
-
-            glLineWidth(1.0) # Reset al grosor
-
-class Fruit:
-    def __init__(self, x, y):
-        self.x = x
-        self.y = y
-        self.r = 8
-        self.color = (0.0, 1.0, 0.0)
-        self.active = True
-
-    def draw(self):
-        if not self.active: return
-        glColor3f(*self.color)
-        glBegin(GL_POLYGON)
-        glVertex2f(self.x, self.y + self.r)
-        glVertex2f(self.x + self.r, self.y)
-        glVertex2f(self.x, self.y - self.r)
-        glVertex2f(self.x - self.r, self.y)
-        glEnd()
-
-class Star:
-    def __init__(self, x, y):
-        self.x = x
-        self.y = y
-        self.r = 12
-        self.color = (1.0, 1.0, 0.0)
-        self.active = True
-    
-    def draw(self):
-        if not self.active: return
-        glColor3f(*self.color)
-        glBegin(GL_POLYGON)
-        glVertex2f(self.x, self.y + self.r)
-        glVertex2f(self.x + self.r, self.y + self.r/2)
-        glVertex2f(self.x + self.r, self.y - self.r/2)
-        glVertex2f(self.x, self.y - self.r)
-        glVertex2f(self.x - self.r, self.y - self.r/2)
-        glVertex2f(self.x - self.r, self.y + self.r/2)
-        glEnd()
-
-def heuristic(a, b):
-    """Calcula la distancia Euclidiana (línea recta) entre dos puntos en la cuadrícula"""
-    return math.hypot(a[0] - b[0], a[1], b[1])
-
-def a_star_search(grid, start, goal):
-    """
-    grid: Matriz de 0 y 1's
-    start: Tupla (col, fila) de inicio
-    goal: Tupla (col, fila) de destino
-    Retorna --> Lista de tuplas [(col, fila), ...] formando la ruta, o [] si no hay.
-    """
-    rows = len(grid)
-    cols = len(grid[0])
-
-    # Cola de prioridad para el Open Set. Guarda tuplas: (f_score, (col, fila))
-    ## Open Set   --> Nosdos descubiertos que aún no han sido evaluados
-    ## Closed Set --> Nodos que ya fueron evaluados por completo, para no volver a caminar sobre nuestro propios pasos
-    open_set = []
-    heapq.heappush(open_set, (0, start))
-
-    # Diccionario para reconstruir el camino
-    came_from = {}
-
-    # Costo desde el inicio
-    g_score = {start: 0}
-
-    # 8 posibles direcciones de movimiento (4+4): Arriba, Abajo, Izquierda, Derecha + Diagonales
-    directions = [(0,1), (0,-1), (1,0), (-1,0), (1,1), (1,-1), (-1,1), (-1,-1)]
-
-    while open_set:
-        # Extraemos el nodo con el menor f(n)
-        current_f, current = heapq.heappop(open_set)
-
-        # Si llegamos al destido/objetivo, reconstruimos el camino hacia atrás
-        if current == goal:
-            path = []
-            while current in came_from:
-                path.append(current)
-                current = came_from[current]
-            path.reverse()
-            return path
-        # Explorar vecinos
-        for dx, dy in directions:
-            neighbor_col = current[0] + dx
-            neighbor_row = current[1] + dy
-
-            # Verificar que el vecino esté dentro de los límites de la matriz/grid
-            if 0 <= neighbor_col < cols and 0 <= neighbor_row < rows:
-                # Verificar que no sea una pared (1)
-                if grid[neighbor_row][neighbor_col] == 1:
-                    continue
-
-                # Costo para moverse en diagonal es mayor (\sqrt{2}) que en línea recta (1)
-                move_cost = math.hypot(dx, dy)
-                tentative_g = g_score[current] + move_cost
-                neighbor = (neighbor_col, neighbor_row)
-
-                # Si encontramos un camino más corto hacia el vecino, lo registramooos
-                if neighbor not in g_score or tentative_g < g_score[neighbor]:
-                    came_from[neighbor] = current
-                    g_score[neighbor] = tentative_g
-
-                    # f(n) = g(n) + h(n)
-                    f_score = tentative_g + heuristic(neighbor, goal)
-                    heapq.heappush(open_set, (f_score, neighbor))
-
-    return [] # Si termina el while y no returnamos, no hay camino posible
-
-class Enemy:
-    def __init__(self, x, y):
-        self.x = x
-        self.y = y
-        self.r = 40
-        self.color = (1.0, 0.0, 0.0)
-        self.speed = 4.5
-
-        # Estados: 'IDLE' (quieto), 'INVESTIGATING' (escuchó sonido), 'FLEEING' (Huyendo del jugador con power-up)
-        self.state = 'IDLE'
-        self.path = [] # Guarda puntos (X,Y) en píxeles
-        self.active = True
-
-        # Frames restantes de visibilidad; el enemigo solo se renderiza cuando este valor > 0
-        self.visibility_timer = 0
-
-        # Frames hasta el próximo destino de patrulla; valor inicial aleatorio para desincronizar enemigos
-        self.wander_timer = random.randint(60, 180)
-        # Cantidad de pasos de búsqueda restantes antes de volver a IDLE
-        self.search_steps = 0
-
-    def calculate_path(self, target_x, target_y, grid):
-        """Convierte coordenadas a índices, corre A* y guarda la ruta en píxeles"""
-        # Discretizar --> Convertir píxeles a índices de celda
-        start_col = int(self.x // CELL_SIZE)
-        start_row = int(self.y // CELL_SIZE)
-
-        goal_col = int(target_x // CELL_SIZE)
-        goal_row = int(target_y // CELL_SIZE)
-
-        start_node = (start_col, start_row)
-        goal_node = (goal_col, goal_row)
-
-        # Ejecutamos A*
-        grid_path = a_star_search(grid, start_node, goal_node)
-
-        # Covertimos a píxeles nuevamente
-        self.path = []
-        for col, row in grid_path:
-            px_x = (col * CELL_SIZE) + (CELL_SIZE / 2)
-            px_y = (row * CELL_SIZE) + (CELL_SIZE / 2)
-            self.path.append((px_x, px_y))
-
-    def update(self, nav_grid):
-        if not self.active: return
-        if self.visibility_timer > 0:
-            self.visibility_timer -= 1
-
-        if self.state == 'IDLE':
-            # Patrulla: cuando no hay ruta activa, elige un destino aleatorio lejano
-            if len(self.path) == 0:
-                self.wander_timer -= 1
-                if self.wander_timer <= 0:
-                    target_x = self.x + random.randint(-300, 300)
-                    target_y = self.y + random.randint(-300, 300)
-                    self.calculate_path(target_x, target_y, nav_grid)
-                    # Delay mínimo para evitar recalcular A* en bucle si el destino es inaccesible
-                    self.wander_timer = 10
-
-        elif self.state == 'INVESTIGATING':
-            # Llegó al origen del sonido → inicia exploración local
-            if len(self.path) == 0:
-                self.state = 'SEARCHING'
-                self.search_steps = 3
-
-        elif self.state == 'SEARCHING':
-            if len(self.path) == 0:
-                if self.search_steps > 0:
-                    # Explora un punto aleatorio en radio reducido (merodea la zona)
-                    target_x = self.x + random.randint(-80, 80)
-                    target_y = self.y + random.randint(-80, 80)
-                    self.calculate_path(target_x, target_y, nav_grid)
-                    self.search_steps -= 1
-                else:
-                    self.state = 'IDLE'
-
-        # Si tenemos una ruta, nos movemos hacia el primer punto de la lista
-        if len(self.path) > 0:
-            target_x, target_y = self.path[0]
-
-            # Dirección hacia el objetivo (vector de dirección)
-            dx = target_x - self.x
-            dy = target_y - self.y
-            dist = math.hypot(dx, dy)
-
-            # Si llegamos a ese punto (o estamos muy cerca), lo sacamos de la lista
-            if dist < self.speed:
-                self.x = target_x
-                self.y = target_y
-                self.path.pop(0)
-            else:
-                # Nomalizar el vector y multiplicarlo por la velocidad
-                self.x += (dx / dist) * self.speed
-                self.y += (dy / dist) * self.speed
-
-    def draw(self, is_player_hunter):
-        if not self.active: return
-        # if self.visibility_timer <= 0: return
-
-        # Si el jugador tiene estrella, el enemigo huye (Cambia de color)
-        if is_player_hunter:
-            self.color = (1.0, 0.5, 0.0) # Naranja
-        else:
-            self.color = (1.0, 0.0, 0.0) 
-        
-        # Testeamos al enemigo con un circulo
-        draw_circle(self.x, self.y, self.r, self.color)
-
-        # DEBUG --> Dibujamos una línea roja para ver la ruta que planeó A*
-        if len(self.path) > 0:
-            glColor3f(1.0, 0.0, 0.0)
-            glBegin(GL_LINE_STRIP)
-            glVertex2f(self.x, self.y)
-            for px, py in self.path:
-                glVertex2f(px, py)
-            glEnd()
-
-
-class Camera:
-    def __init__(self, width, height, map_width, map_height):
-        self.width = width
-        self.height = height
-        self.map_width = map_width
-        self.map_height = map_height
-        self.x = 0
-        self.y = 0
-
-    def update(self, target_x, target_y):
-        # La cámara se centra en el player
-        self.x = target_x - (self.width / 2)
-        self.y = target_y - (self.height / 2)
-
-        # Evitar que la cámara muestre fuera de los límites del mapa
-        self.x = max(0, min(self.x, self.map_width - self.width))
-        self.y = max(0, min(self.y, self.map_height - self.height))
-
-    def apply(self):
-        # Mueve el mundo en sentido contrario de la cámara
-        glLoadIdentity()
-        glTranslatef(-self.x, -self.y, 0)
-
 def init_opengl():
-    # Contexto 2D de OpenGL
     glViewport(0, 0, WIDTH, HEIGHT)
-
-    glMatrixMode(GL_PROJECTION) # -> Cámara
+    glMatrixMode(GL_PROJECTION)
     glLoadIdentity()
-
-    # Configurar cámara ortográfica 2D
     gluOrtho2D(0, WIDTH, 0, HEIGHT)
-
-    glMatrixMode(GL_MODELVIEW) # -> Objetos
+    glMatrixMode(GL_MODELVIEW)
     glLoadIdentity()
-
-    glClearColor(0.02, 0.02, 0.02, 1.0) # -> Fondo
+    glClearColor(0.02, 0.02, 0.02, 1.0)
 
 def create_nav_grid(map_w, map_h, walls, cell_size):
-    """Convierte el mapa continuo en una matriz discreta de 0 y 1s para navegación | algoritmos"""
+    """Convierte el mapa continuo en una matriz discreta de 0 y 1s para navegación"""
     cols = map_w // cell_size
     rows = map_h // cell_size
-
-    # Matriz bidimensional inicializada en 0 (celdas transitables)
     grid = [[0 for _ in range(cols)] for _ in range(rows)]
 
     for r in range(rows):
         for c in range(cols):
-            # Coordenadas reales de la celda
             cell_x = c * cell_size
             cell_y = r * cell_size
-
-            # Comprobar si la celda choca con alguna pared
             for wall in walls:
-                # Si hay intersección entre la celda y la pared, se marca como no transitable (1)
                 if (cell_x < wall.x + wall.w and cell_x + cell_size > wall.x and
-                    cell_y < wall.y + wall.h and cell_y + cell_size > wall.y):
+                        cell_y < wall.y + wall.h and cell_y + cell_size > wall.y):
                     grid[r][c] = 1
                     break
     return grid
@@ -561,97 +86,52 @@ def main():
     pygame.font.init()
 
     display_flags = DOUBLEBUF | OPENGL
-    pygame.display.set_mode((WIDTH,HEIGHT), display_flags)
+    pygame.display.set_mode((WIDTH, HEIGHT), display_flags)
     pygame.display.set_caption("Resonance - Entregable 3")
 
     init_opengl()
     clock = pygame.time.Clock()
 
-    # Fuentes para el HUD (Head-Up Display) y menú
     font_title = pygame.font.SysFont("Courier", 72, bold=True)
-    font_menu = pygame.font.SysFont("Courier", 36, bold=True)
-    font_hud = pygame.font.SysFont("Arial", 24, bold=True)
+    font_menu  = pygame.font.SysFont("Courier", 36, bold=True)
+    font_hud   = pygame.font.SysFont("Arial",   24, bold=True)
 
-    # Definimos un mapa 2 veces más grande que la ventana
     MAP_WIDTH, MAP_HEIGHT = 1600, 1200
 
-    player = Player(MAP_WIDTH//2,MAP_HEIGHT//2)
-    camera = Camera(WIDTH, HEIGHT, MAP_WIDTH, MAP_HEIGHT)
-
-    # Game loop
-
-    walls = [
-        # --- BORDES DEL MAPA (Para que la onda ilumine los límites) ---
-        Wall(0, 0, 1600, 40),       # Borde Inferior
-        Wall(0, 1160, 1600, 40),    # Borde Superior
-        Wall(0, 0, 40, 1200),       # Borde Izquierdo
-        Wall(1560, 0, 40, 1200),    # Borde Derecho
-
-        # --- ZONA CENTRAL (Refugio de inicio, el jugador nace en 800, 600) ---
-        Wall(650, 500, 40, 200),    # Escudo izquierdo
-        Wall(910, 500, 40, 200),    # Escudo derecho
-        Wall(700, 750, 200, 40),    # Techo del centro
-
-        # --- CUADRANTE INFERIOR IZQUIERDO (Zona de Zig-Zag) ---
-        Wall(150, 200, 400, 40),    # Fila 1
-        Wall(150, 350, 400, 40),    # Fila 2
-        Wall(150, 500, 300, 40),    # Fila 3
-        Wall(150, 200, 40, 190),    # Cierre vertical izquierdo
-        Wall(510, 350, 40, 190),    # Cierre vertical derecho
-
-        # --- CUADRANTE INFERIOR DERECHO (Zona de Pilares, ideal para sigilo) ---
-        Wall(1000, 200, 80, 80),
-        Wall(1300, 250, 80, 80),
-        Wall(1150, 400, 80, 80),
-        Wall(950, 550, 80, 80),
-        Wall(1400, 450, 80, 80),
-
-        # --- CUADRANTE SUPERIOR DERECHO (Pasillos largos de alta velocidad) ---
-        Wall(1000, 950, 400, 40),   # Pasillo superior
-        Wall(900, 800, 500, 40),    # Pasillo medio
-        Wall(1360, 600, 40, 390),   # Muro vertical derecho
-        Wall(900, 800, 40, 250),    # Muro vertical izquierdo
-
-        # --- CUADRANTE SUPERIOR IZQUIERDO (Laberinto cerrado) ---
-        Wall(200, 900, 300, 40),
-        Wall(200, 700, 40, 240),
-        Wall(350, 750, 250, 40),
-        Wall(400, 1000, 40, 160),
-        Wall(600, 850, 40, 200)
-    ]
-
-    # Generar la matriz de navegación (Solo una vez)
-    nav_grid = create_nav_grid(MAP_WIDTH, MAP_HEIGHT, walls, CELL_SIZE)
-
     # VARIABLES GLOBALES DEL JUEGO
-    state = "MENU" # Estados posibles --> "MENU", "PLAYING", "GAME_OVER"
-    menu_idx = 0 # 0: Nueva partida, 1: Continuar
-    high_score = 0
+    state         = "MENU"
+    menu_idx      = 0
+    high_score    = 0
     current_score = 0
-    game_started = False # saber si Botón "Continuar" es válido o no
-    
+    game_started  = False
+    current_level = 1
+
     # VARIABLES SESIÓN ACTUAL
-    player = None
-    camera = None
-    waves = []
-    fruits = []
-    stars = []
-    enemies = []
+    player   = None
+    camera   = None
+    waves    = []
+    fruits   = []
+    stars    = []
+    enemies  = []
+    walls    = []
+    nav_grid = []
 
     def reset_game():
-        nonlocal player, camera, waves, fruits, stars, enemies
-        player = Player(MAP_WIDTH//2,MAP_HEIGHT//2)
-        camera = Camera(WIDTH, HEIGHT, MAP_WIDTH, MAP_HEIGHT)
-        waves = []
-        fruits = [Fruit(1050, 970), Fruit(1150, 970), Fruit(1250, 970), Fruit(250, 250), Fruit(250, 400), Fruit(400, 520)]
-        stars = [Star(1100, 320)]
-        enemies = [Enemy(250, 400), Enemy(1200, 320), Enemy(500, 950)]
-        for wall in walls: wall.brightness = 0.0
+        nonlocal player, camera, waves, fruits, stars, enemies, walls, nav_grid
+        data     = get_level(current_level)
+        walls    = data['walls']
+        fruits   = data['fruits']
+        stars    = data['stars']
+        enemies  = data['enemies']
+        sx, sy   = data['player_start']
+        player   = Player(sx, sy)
+        camera   = Camera(WIDTH, HEIGHT, MAP_WIDTH, MAP_HEIGHT)
+        waves    = []
+        nav_grid = create_nav_grid(MAP_WIDTH, MAP_HEIGHT, walls, CELL_SIZE)
 
     running = True
 
     while running:
-        # Captura de eventos
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
@@ -662,42 +142,39 @@ def main():
                         state = "MENU"
                     elif event.key == K_SPACE:
                         waves.append(SoundWave(player.x, player.y))
-                
+
                 elif state == "MENU":
                     if event.key == K_UP or event.key == K_DOWN:
-                        menu_idx = 1 - menu_idx # Alternamos entre 0 y 1
+                        menu_idx = 1 - menu_idx
                     elif event.key == K_RETURN:
-                        if menu_idx == 0: # New game
+                        if menu_idx == 0:
                             reset_game()
                             game_started = True
                             state = "PLAYING"
-                        elif menu_idx == 1 and game_started: # Continue
+                        elif menu_idx == 1 and game_started:
                             state = "PLAYING"
-                
+
                 elif state == "GAME_OVER":
                     if event.key == K_RETURN:
                         state = "MENU"
-        
+
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
 
-        # Máquina de estados --
         if state == "MENU":
-            # Dibujamos menú principal
-            draw_text(WIDTH//2 - 200, HEIGHT - 150, "RESONANCE", font_title, color=(0,255,255))
-            c_new = (255,255,0) if menu_idx == 0 else (100,100,100)
-            draw_text(WIDTH//2 - 150, HEIGHT//2, "> Nueva Partida", font_menu, color=c_new)
+            draw_text(WIDTH//2 - 200, HEIGHT - 150, "RESONANCE", font_title, color=(0, 255, 255))
+            c_new  = (255, 255, 0) if menu_idx == 0 else (100, 100, 100)
+            c_cont = (255, 255, 0) if menu_idx == 1 else (100, 100, 100)
+            if not game_started:
+                c_cont = (40, 40, 40)
+            draw_text(WIDTH//2 - 150, HEIGHT//2,      "> Nueva Partida", font_menu, color=c_new)
+            draw_text(WIDTH//2 - 150, HEIGHT//2 - 50, "> Continuar",     font_menu, color=c_cont)
 
-            c_cont = (255,255,0) if menu_idx == 1 else (100,100,100)
-            if not game_started: c_cont = (40,40,40) # Desactivado
-            draw_text(WIDTH//2 - 150, HEIGHT//2 - 50, "> Continuar", font_menu, color=c_cont)
-
-        
         elif state == "GAME_OVER":
-            draw_text(WIDTH//2 - 200, HEIGHT - 200, "GAME OVER", font_title, color=(255,0,0))
-            draw_text(WIDTH//2 - 150, HEIGHT//2, f"Puntuacion Final: {current_score}", font_menu, (255, 255, 255))
-            draw_text(WIDTH//2 - 150, HEIGHT//2 - 50, f"Max. Historico: {high_score}", font_menu, (0, 255, 0))
-            draw_text(WIDTH//2 - 220, 100, "Presiona ENTER para volver al Menu", font_hud, (150, 150, 150))
-        
+            draw_text(WIDTH//2 - 200, HEIGHT - 200, "GAME OVER",                          font_title, color=(255, 0, 0))
+            draw_text(WIDTH//2 - 150, HEIGHT//2,    f"Puntuacion Final: {current_score}", font_menu,  (255, 255, 255))
+            draw_text(WIDTH//2 - 150, HEIGHT//2 - 50, f"Max. Historico: {high_score}",   font_menu,  (0, 255, 0))
+            draw_text(WIDTH//2 - 220, 100, "Presiona ENTER para volver al Menu",          font_hud,   (150, 150, 150))
+
         elif state == "PLAYING":
             keys = pygame.key.get_pressed()
             player.update(keys, MAP_WIDTH, MAP_HEIGHT, walls)
@@ -708,7 +185,7 @@ def main():
                 if fruit.active and math.hypot(player.x - fruit.x, player.y - fruit.y) < (player.r + fruit.r):
                     fruit.active = False
                     player.score += 10
-            
+
             for star in stars:
                 if star.active and math.hypot(player.x - star.x, player.y - star.y) < (player.r + star.r):
                     star.active = False
@@ -718,7 +195,6 @@ def main():
             # Enemigos
             for enemy in enemies:
                 enemy.update(nav_grid)
-                # Colisión jugador-enemigo
                 if enemy.active:
                     dist = math.hypot(player.x - enemy.x, player.y - enemy.y)
                     if dist < (player.r + enemy.r):
@@ -726,82 +202,62 @@ def main():
                             enemy.active = False
                             player.score += 50
                         else:
-                            # Muerte del jugador
                             current_score = player.score
                             if current_score > high_score:
                                 high_score = current_score
                             game_started = False
                             menu_idx = 0
                             state = "GAME_OVER"
-                
-            # Onda y Ecolocalización
-            # Filtar ondas que ya no están activas
+
+            # Ondas y ecolocalización
             for wave in waves:
                 wave.update()
-
-                # DETECCIÓN ENEMIGA
                 for enemy in enemies:
                     dist = math.hypot(wave.x - enemy.x, wave.y - enemy.y)
-
-                    # Si el borde de la onda toca al enemigo (Con un margen de error)
                     if abs(dist - wave.radius) < 15.0:
                         enemy.calculate_path(wave.x, wave.y, nav_grid)
                         enemy.state = 'INVESTIGATING'
                         # La onda "ilumina" al enemigo por 3 segundos
                         enemy.visibility_timer = FPS * 3
 
-            # Filtrar ondas que ya no están activas                    
             waves = [w for w in waves if w.active]
-            for wall in walls: wall.update(waves)
-        
-            # Rederizado del Nivel
-            # Aplicar el desplazamiento de la cámara antes de dibujar
+            for wall in walls:
+                wall.update(waves)
+
+            # Renderizado
             camera.apply()
 
             draw_grid(MAP_WIDTH, MAP_HEIGHT)
             glColor3f(0.15, 0.15, 0.15)
             glBegin(GL_LINE_LOOP)
-            glVertex2f(0,0)
+            glVertex2f(0, 0)
             glVertex2f(MAP_WIDTH, 0)
             glVertex2f(MAP_WIDTH, MAP_HEIGHT)
             glVertex2f(0, MAP_HEIGHT)
             glEnd()
 
-            # Dibujar los obstaculos (con la iluminación)
             for wall in walls:
                 wall.draw()
-            
-            # Dibujamos los objeto recolectables
             for fruit in fruits:
                 fruit.draw()
-
             for star in stars:
                 star.draw()
-
-            for wave in waves: # dibujamos las ondas antes que el jugador para que quede por encima
+            for wave in waves:
                 wave.draw()
-
             for enemy in enemies:
                 enemy.draw(player.is_hunter)
-            
-            # Jugador
             player.draw()
 
-            # Renderizado del HUD (Interfaz fija)
-            draw_text(20, HEIGHT - 40, f"SCORE: {player.score}",font_hud, color=(0,255,0))
+            # HUD
+            draw_text(20, HEIGHT - 40, f"SCORE: {player.score}", font_hud, color=(0, 255, 0))
             if player.is_hunter:
-                draw_text(WIDTH//2 - 60, HEIGHT - 40, "MODO CAZADOR", font_hud, (255,255,0))
-   
-        # Intercambiar los buffers para mostrar lo que se ha dibujado
-        pygame.display.flip()
+                draw_text(WIDTH//2 - 60, HEIGHT - 40, "MODO CAZADOR", font_hud, (255, 255, 0))
 
-        # Control de fotogramas per second
+        pygame.display.flip()
         clock.tick(FPS)
 
-    # Limpieza y cierre
     pygame.quit()
     sys.exit()
 
 if __name__ == "__main__":
     main()
-
