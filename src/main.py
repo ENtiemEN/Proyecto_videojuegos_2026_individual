@@ -5,6 +5,7 @@ from OpenGL.GLU import * # -> Funciones auxiliares de alto nivel e.g. `gluOrtho2
 import sys
 import math
 import heapq
+import random
 
 # Global Config
 WIDTH, HEIGHT = 800, 600
@@ -392,6 +393,9 @@ class Enemy:
         # Frames restantes de visibilidad; el enemigo solo se renderiza cuando este valor > 0
         self.visibility_timer = 0
 
+        # Frames hasta el próximo destino de patrulla; valor inicial aleatorio para desincronizar enemigos
+        self.wander_timer = random.randint(60, 180)
+
     def calculate_path(self, target_x, target_y, grid):
         """Convierte coordenadas a índices, corre A* y guarda la ruta en píxeles"""
         # Discretizar --> Convertir píxeles a índices de celda
@@ -414,10 +418,20 @@ class Enemy:
             px_y = (row * CELL_SIZE) + (CELL_SIZE / 2)
             self.path.append((px_x, px_y))
 
-    def update(self):
+    def update(self, nav_grid):
         if not self.active: return
         if self.visibility_timer > 0:
             self.visibility_timer -= 1
+
+        # Patrulla: cuando no hay ruta activa, elige un destino aleatorio cercano
+        if len(self.path) == 0:
+            self.wander_timer -= 1
+            if self.wander_timer <= 0:
+                target_x = self.x + random.randint(-150, 150)
+                target_y = self.y + random.randint(-150, 150)
+                self.calculate_path(target_x, target_y, nav_grid)
+                self.wander_timer = random.randint(120, 240)
+
         # Si tenemos una ruta, nos movemos hacia el primer punto de la lista
         if len(self.path) > 0:
             target_x, target_y = self.path[0]
@@ -682,7 +696,7 @@ def main():
 
             # Enemigos
             for enemy in enemies:
-                enemy.update()
+                enemy.update(nav_grid)
                 # Colisión jugador-enemigo
                 if enemy.active:
                     dist = math.hypot(player.x - enemy.x, player.y - enemy.y)
