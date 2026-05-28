@@ -45,6 +45,43 @@ def draw_text(x, y, text, font, color=(255, 255, 255)):
     glPopMatrix()
     glMatrixMode(GL_MODELVIEW)
 
+def draw_bar(x, y, bar_w, bar_h, fill_ratio, fill_color, bg_color=(30, 30, 30)):
+    """Dibuja una barra de progreso en coordenadas de pantalla (0-255 para colores)"""
+    glMatrixMode(GL_PROJECTION)
+    glPushMatrix()
+    glLoadIdentity()
+    gluOrtho2D(0, WIDTH, 0, HEIGHT)
+    glMatrixMode(GL_MODELVIEW)
+    glPushMatrix()
+    glLoadIdentity()
+
+    glEnable(GL_BLEND)
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+
+    glColor3f(bg_color[0]/255, bg_color[1]/255, bg_color[2]/255)
+    glBegin(GL_QUADS)
+    glVertex2f(x,         y)
+    glVertex2f(x + bar_w, y)
+    glVertex2f(x + bar_w, y + bar_h)
+    glVertex2f(x,         y + bar_h)
+    glEnd()
+
+    fill_w = bar_w * max(0.0, min(1.0, fill_ratio))
+    glColor3f(fill_color[0]/255, fill_color[1]/255, fill_color[2]/255)
+    glBegin(GL_QUADS)
+    glVertex2f(x,          y)
+    glVertex2f(x + fill_w, y)
+    glVertex2f(x + fill_w, y + bar_h)
+    glVertex2f(x,          y + bar_h)
+    glEnd()
+
+    glDisable(GL_BLEND)
+
+    glPopMatrix()
+    glMatrixMode(GL_PROJECTION)
+    glPopMatrix()
+    glMatrixMode(GL_MODELVIEW)
+
 def draw_grid(map_width, map_height, step=100):
     glColor3f(0.06, 0.06, 0.06)
     glBegin(GL_LINES)
