@@ -426,14 +426,15 @@ class Enemy:
             self.visibility_timer -= 1
 
         if self.state == 'IDLE':
-            # Patrulla: cuando no hay ruta activa, elige un destino aleatorio cercano
+            # Patrulla: cuando no hay ruta activa, elige un destino aleatorio lejano
             if len(self.path) == 0:
                 self.wander_timer -= 1
                 if self.wander_timer <= 0:
-                    target_x = self.x + random.randint(-150, 150)
-                    target_y = self.y + random.randint(-150, 150)
+                    target_x = self.x + random.randint(-300, 300)
+                    target_y = self.y + random.randint(-300, 300)
                     self.calculate_path(target_x, target_y, nav_grid)
-                    self.wander_timer = random.randint(120, 240)
+                    # Delay mínimo para evitar recalcular A* en bucle si el destino es inaccesible
+                    self.wander_timer = 10
 
         elif self.state == 'INVESTIGATING':
             # Llegó al origen del sonido → inicia exploración local
@@ -473,7 +474,7 @@ class Enemy:
 
     def draw(self, is_player_hunter):
         if not self.active: return
-        if self.visibility_timer <= 0: return
+        # if self.visibility_timer <= 0: return
 
         # Si el jugador tiene estrella, el enemigo huye (Cambia de color)
         if is_player_hunter:
