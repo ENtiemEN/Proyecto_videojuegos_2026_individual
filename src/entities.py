@@ -84,21 +84,24 @@ class Player:
             self.vy *= ratio
 
         # COLISIONES
+        # La resolución usa posición relativa al centro de la pared, no la dirección
+        # de la velocidad. Esto evita que el jugador quede atrapado cuando vx/vy ≈ 0
+        # al momento del contacto (e.g. entrando en diagonal a un corredor estrecho).
         self.x += self.vx
         for wall in walls:
             if self.check_collision(wall):
-                if self.vx > 0:
+                if self.x < wall.x + wall.w / 2:
                     self.x = wall.x - self.base_r
-                elif self.vx < 0:
+                else:
                     self.x = wall.x + wall.w + self.base_r
                 self.vx = 0
 
         self.y += self.vy
         for wall in walls:
             if self.check_collision(wall):
-                if self.vy > 0:
+                if self.y < wall.y + wall.h / 2:
                     self.y = wall.y - self.base_r
-                elif self.vy < 0:
+                else:
                     self.y = wall.y + wall.h + self.base_r
                 self.vy = 0
 
@@ -422,7 +425,7 @@ class Enemy:
 
     def draw(self, is_player_hunter):
         if not self.active: return
-        # if self.visibility_timer <= 0: return
+        if self.visibility_timer <= 0: return
 
         if is_player_hunter:
             self.color = (1.0, 0.5, 0.0)
