@@ -194,12 +194,20 @@ class Wall:
 
 
 class Fruit:
-    def __init__(self, x, y):
+    def __init__(self, x, y, respawn_delay=0):
         self.x = x
         self.y = y
         self.r = 8
         self.color = (0.0, 1.0, 0.0)
         self.active = True
+        self.respawn_delay = respawn_delay
+        self.respawn_timer = 0
+
+    def update(self):
+        if not self.active and self.respawn_delay > 0:
+            self.respawn_timer -= 1
+            if self.respawn_timer <= 0:
+                self.active = True
 
     def draw(self):
         if not self.active: return
