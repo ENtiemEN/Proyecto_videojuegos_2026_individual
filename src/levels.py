@@ -1,12 +1,13 @@
 from entities import Wall, Fruit, Star, Enemy, Exit
 
-MAX_LEVEL = 3  # actualizar al agregar cada nuevo nivel
+MAX_LEVEL = 4
 
 def get_level(n):
     levels = {
         1: level_1,
         2: level_2,
         3: level_3,
+        4: level_4,
     }
     return levels.get(n, level_1)()
 
@@ -194,4 +195,48 @@ def level_3():
         'enemies':      enemies,
         'exit':         Exit(1450, 750),
         'player_start': (800, 600),
+    }
+
+
+# =============================================================================
+# NIVEL 4 — Supervivencia
+# Mapa abierto con pilares dispersos. Sin salida. Las frutas reaparecen cada
+# 8 segundos. Los enemigos se generan progresivamente en los bordes del mapa.
+# El objetivo es acumular la mayor puntuación posible antes de morir.
+# =============================================================================
+def level_4():
+    walls = [
+        # Bordes
+        Wall(0, 0, 1600, 40),
+        Wall(0, 1160, 1600, 40),
+        Wall(0, 0, 40, 1200),
+        Wall(1560, 0, 40, 1200),
+
+        # Pilares dispersos
+        Wall(300,  300,  80, 80),
+        Wall(700,  200,  80, 80),
+        Wall(1200, 300,  80, 80),
+        Wall(200,  700,  80, 80),
+        Wall(800,  580,  80, 80),
+        Wall(1300, 700,  80, 80),
+        Wall(400,  1000, 80, 80),
+        Wall(1100, 900,  80, 80),
+    ]
+
+    # respawn_delay = 480 frames = 8 segundos a 60 FPS
+    fruits = [
+        Fruit(200,  200,  480), Fruit(800,  150,  480),
+        Fruit(1400, 200,  480), Fruit(150,  600,  480),
+        Fruit(1450, 600,  480), Fruit(200,  1050, 480),
+        Fruit(800,  1050, 480), Fruit(1400, 1050, 480),
+    ]
+
+    return {
+        'walls':        walls,
+        'fruits':       fruits,
+        'stars':        [],
+        'enemies':      [Enemy(400, 400), Enemy(1200, 800)],
+        'exit':         None,
+        'player_start': (800, 600),
+        'survival':     True,
     }
