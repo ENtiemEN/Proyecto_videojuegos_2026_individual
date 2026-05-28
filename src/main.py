@@ -176,9 +176,12 @@ def main():
             draw_text(WIDTH//2 - 150, HEIGHT//2 - 50, "> Continuar",     font_menu, color=c_cont)
 
         elif state == "WIN":
-            draw_text(WIDTH//2 - 220, HEIGHT - 200, "NIVEL COMPLETADO", font_title, color=(0, 255, 0))
-            draw_text(WIDTH//2 - 150, HEIGHT//2,    f"Puntuacion: {player.score}",   font_menu,  (255, 255, 255))
-            draw_text(WIDTH//2 - 220, 100, "Presiona ENTER para volver al Menu",     font_hud,   (150, 150, 150))
+            win_title = "NIVEL COMPLETADO"
+            win_score = f"Puntuacion: {player.score}"
+            win_hint  = "Presiona ENTER para volver al Menu"
+            draw_text(WIDTH//2 - font_title.size(win_title)[0]//2, HEIGHT - 200, win_title, font_title, color=(0, 255, 0))
+            draw_text(WIDTH//2 - font_menu.size(win_score)[0]//2,  HEIGHT//2,    win_score, font_menu,  (255, 255, 255))
+            draw_text(WIDTH//2 - font_hud.size(win_hint)[0]//2,    100,          win_hint,  font_hud,   (150, 150, 150))
 
         elif state == "GAME_OVER":
             draw_text(WIDTH//2 - 200, HEIGHT - 200, "GAME OVER",                          font_title, color=(255, 0, 0))

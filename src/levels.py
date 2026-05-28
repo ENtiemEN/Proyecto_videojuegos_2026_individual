@@ -48,8 +48,8 @@ def level_1():
     ]
 
     fruits = [
-        Fruit(1050, 970), Fruit(1150, 970), Fruit(1250, 970),
-        Fruit(250, 250),  Fruit(250, 400),  Fruit(400, 520),
+        Fruit(1050, 1050), Fruit(1150, 1050), Fruit(1280, 1050),  # encima de Wall(1000,950) — accesibles por el norte
+        Fruit(250, 250),   Fruit(250, 400),   Fruit(300, 450),    # Fruit(400,520) movida fuera de Wall(150,500)
     ]
 
     stars = [Star(1100, 320)]
