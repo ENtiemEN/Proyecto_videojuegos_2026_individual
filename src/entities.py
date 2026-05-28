@@ -230,6 +230,59 @@ class Star:
         glEnd()
 
 
+class Exit:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+        self.size = 28       # semilado del cuadrado visual
+        self.r   = 30        # radio de colisión
+        self.brightness  = 0.0
+        self.base_color  = (0.8, 0.0, 1.0)  # magenta/violeta — distinto de todo lo demás
+        self.active_color = (1.0, 0.4, 1.0)
+
+    def update(self, waves, all_fruits_collected):
+        # Cuando todas las frutas están recogidas, la salida permanece iluminada
+        if all_fruits_collected:
+            self.brightness = 1.0
+            return
+
+        if self.brightness > 0:
+            self.brightness = max(0.0, self.brightness - 0.01)  # desvanece más lento que las paredes
+
+        for wave in waves:
+            dist = math.hypot(wave.x - self.x, wave.y - self.y)
+            if abs(dist - wave.radius) < 15.0:
+                self.brightness = 1.0
+
+    def draw(self, all_fruits_collected):
+        if self.brightness <= 0:
+            return
+
+        color = self.active_color if all_fruits_collected else (
+            self.base_color[0] * self.brightness,
+            self.base_color[1] * self.brightness,
+            self.base_color[2] * self.brightness,
+        )
+        s = self.size
+        glColor3f(*color)
+        glLineWidth(2.0)
+        # Cuadrado exterior
+        glBegin(GL_LINE_LOOP)
+        glVertex2f(self.x - s, self.y - s)
+        glVertex2f(self.x + s, self.y - s)
+        glVertex2f(self.x + s, self.y + s)
+        glVertex2f(self.x - s, self.y + s)
+        glEnd()
+        # Cruz interior — identifica visualmente la salida
+        glBegin(GL_LINES)
+        glVertex2f(self.x - s, self.y)
+        glVertex2f(self.x + s, self.y)
+        glVertex2f(self.x, self.y - s)
+        glVertex2f(self.x, self.y + s)
+        glEnd()
+        glLineWidth(1.0)
+
+
 def heuristic(a, b):
     """Calcula la distancia Euclidiana (línea recta) entre dos puntos en la cuadrícula"""
     return math.hypot(a[0] - b[0], a[1], b[1])
