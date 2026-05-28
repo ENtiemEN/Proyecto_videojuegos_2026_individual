@@ -5,7 +5,7 @@ from OpenGL.GLU import *
 import sys
 import math
 
-from entities import Player, SoundWave, Wall, Fruit, Star, Enemy, Camera, CELL_SIZE
+from entities import Player, SoundWave, Wall, Fruit, Star, Enemy, Camera, Exit, CELL_SIZE
 from levels import get_level
 
 # Global Config
@@ -115,14 +115,16 @@ def main():
     enemies  = []
     walls    = []
     nav_grid = []
+    exit_obj = None
 
     def reset_game():
-        nonlocal player, camera, waves, fruits, stars, enemies, walls, nav_grid
+        nonlocal player, camera, waves, fruits, stars, enemies, walls, nav_grid, exit_obj
         data     = get_level(current_level)
         walls    = data['walls']
         fruits   = data['fruits']
         stars    = data['stars']
         enemies  = data['enemies']
+        exit_obj = data['exit']
         sx, sy   = data['player_start']
         player   = Player(sx, sy)
         camera   = Camera(WIDTH, HEIGHT, MAP_WIDTH, MAP_HEIGHT)
@@ -158,6 +160,10 @@ def main():
                     if event.key == K_RETURN:
                         state = "MENU"
 
+                elif state == "WIN":
+                    if event.key == K_RETURN:
+                        state = "MENU"
+
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
 
         if state == "MENU":
@@ -168,6 +174,11 @@ def main():
                 c_cont = (40, 40, 40)
             draw_text(WIDTH//2 - 150, HEIGHT//2,      "> Nueva Partida", font_menu, color=c_new)
             draw_text(WIDTH//2 - 150, HEIGHT//2 - 50, "> Continuar",     font_menu, color=c_cont)
+
+        elif state == "WIN":
+            draw_text(WIDTH//2 - 220, HEIGHT - 200, "NIVEL COMPLETADO", font_title, color=(0, 255, 0))
+            draw_text(WIDTH//2 - 150, HEIGHT//2,    f"Puntuacion: {player.score}",   font_menu,  (255, 255, 255))
+            draw_text(WIDTH//2 - 220, 100, "Presiona ENTER para volver al Menu",     font_hud,   (150, 150, 150))
 
         elif state == "GAME_OVER":
             draw_text(WIDTH//2 - 200, HEIGHT - 200, "GAME OVER",                          font_title, color=(255, 0, 0))
@@ -224,6 +235,14 @@ def main():
             for wall in walls:
                 wall.update(waves)
 
+            # Salida
+            all_fruits = all(not f.active for f in fruits)
+            exit_obj.update(waves, all_fruits)
+            if all_fruits:
+                dist = math.hypot(player.x - exit_obj.x, player.y - exit_obj.y)
+                if dist < (player.r + exit_obj.r):
+                    state = "WIN"
+
             # Renderizado
             camera.apply()
 
@@ -246,6 +265,7 @@ def main():
                 wave.draw()
             for enemy in enemies:
                 enemy.draw(player.is_hunter)
+            exit_obj.draw(all_fruits)
             player.draw()
 
             # HUD

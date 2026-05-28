@@ -1,4 +1,4 @@
-from entities import Wall, Fruit, Star, Enemy
+from entities import Wall, Fruit, Star, Enemy, Exit
 
 def get_level(n):
     levels = {
@@ -61,5 +61,6 @@ def level_1():
         'fruits':       fruits,
         'stars':        stars,
         'enemies':      enemies,
+        'exit':         Exit(1450, 1080),
         'player_start': (800, 600),
     }
