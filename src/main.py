@@ -255,13 +255,34 @@ def main():
             for wall in walls:
                 wall.update(waves)
 
-            # Salida
-            all_fruits = all(not f.active for f in fruits)
-            exit_obj.update(waves, all_fruits)
-            if all_fruits:
-                dist = math.hypot(player.x - exit_obj.x, player.y - exit_obj.y)
-                if dist < (player.r + exit_obj.r):
-                    state = "WIN"
+            # Salida (no existe en modo supervivencia)
+            all_fruits = False
+            if exit_obj is not None:
+                all_fruits = all(not f.active for f in fruits)
+                exit_obj.update(waves, all_fruits)
+                if all_fruits:
+                    dist = math.hypot(player.x - exit_obj.x, player.y - exit_obj.y)
+                    if dist < (player.r + exit_obj.r):
+                        state = "WIN"
+
+            # Spawning progresivo de enemigos en supervivencia
+            if survival_mode:
+                enemy_spawn_timer -= 1
+                if enemy_spawn_timer <= 0:
+                    edge = random.randint(0, 3)
+                    if edge == 0:
+                        sx, sy = random.randint(60, 1540), 60
+                    elif edge == 1:
+                        sx, sy = random.randint(60, 1540), 1140
+                    elif edge == 2:
+                        sx, sy = 60, random.randint(60, 1140)
+                    else:
+                        sx, sy = 1540, random.randint(60, 1140)
+                    new_enemy = Enemy(sx, sy)
+                    new_enemy.visibility_timer = FPS * 3
+                    enemies.append(new_enemy)
+                    enemy_spawn_interval = max(300, int(enemy_spawn_interval * 0.95))
+                    enemy_spawn_timer = enemy_spawn_interval
 
             # Renderizado
             camera.apply()
