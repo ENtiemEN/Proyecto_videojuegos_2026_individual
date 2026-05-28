@@ -137,12 +137,13 @@ def main():
     MAP_WIDTH, MAP_HEIGHT = 1600, 1200
 
     # VARIABLES GLOBALES DEL JUEGO
-    state         = "MENU"
-    menu_idx      = 0
-    high_score    = 0
-    current_score = 0
-    game_started  = False
-    current_level = 1
+    state              = "MENU"
+    menu_idx           = 0
+    high_score         = 0
+    current_score      = 0
+    game_started       = False
+    current_level      = 1
+    survival_unlocked  = False
 
     # VARIABLES SESIÓN ACTUAL
     player              = None
@@ -191,8 +192,11 @@ def main():
                         waves.append(SoundWave(player.x, player.y))
 
                 elif state == "MENU":
-                    if event.key == K_UP or event.key == K_DOWN:
-                        menu_idx = 1 - menu_idx
+                    num_options = 2 + (1 if survival_unlocked else 0)
+                    if event.key == K_DOWN:
+                        menu_idx = (menu_idx + 1) % num_options
+                    elif event.key == K_UP:
+                        menu_idx = (menu_idx - 1) % num_options
                     elif event.key == K_RETURN:
                         if menu_idx == 0:
                             current_level = 1
@@ -200,6 +204,11 @@ def main():
                             game_started = True
                             state = "PLAYING"
                         elif menu_idx == 1 and game_started:
+                            state = "PLAYING"
+                        elif menu_idx == 2 and survival_unlocked:
+                            current_level = 4
+                            reset_game()
+                            game_started = True
                             state = "PLAYING"
 
                 elif state == "GAME_OVER":
@@ -209,6 +218,8 @@ def main():
                 elif state == "WIN":
                     if event.key == K_RETURN:
                         if current_level < MAX_LEVEL:
+                            if current_level == MAX_LEVEL - 1:
+                                survival_unlocked = True
                             current_level += 1
                             reset_game()
                             state = "PLAYING"
@@ -225,6 +236,9 @@ def main():
                 c_cont = (40, 40, 40)
             draw_text(WIDTH//2 - 150, HEIGHT//2,      "> Nueva Partida", font_menu, color=c_new)
             draw_text(WIDTH//2 - 150, HEIGHT//2 - 50, "> Continuar",     font_menu, color=c_cont)
+            if survival_unlocked:
+                c_surv = (255, 255, 0) if menu_idx == 2 else (100, 100, 100)
+                draw_text(WIDTH//2 - 150, HEIGHT//2 - 100, "> Supervivencia", font_menu, color=c_surv)
 
         elif state == "WIN":
             win_title = "NIVEL COMPLETADO"
@@ -351,6 +365,8 @@ def main():
             draw_text(20, HEIGHT - 40, f"SCORE: {player.score}", font_hud, color=(0, 255, 0))
             if player.is_hunter:
                 draw_text(WIDTH//2 - 60, HEIGHT - 40, "MODO CAZADOR", font_hud, (255, 255, 0))
+                fill = player.hunter_timer / (FPS * 10)
+                draw_bar(WIDTH//2 - 100, HEIGHT - 58, 200, 10, fill, (255, 220, 0))
             if survival_mode:
                 active_count = sum(1 for e in enemies if e.active)
                 draw_text(WIDTH - 230, HEIGHT - 40, f"ENEMIGOS: {active_count}", font_hud, color=(255, 50, 50))
