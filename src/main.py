@@ -395,6 +395,8 @@ class Enemy:
 
         # Frames hasta el próximo destino de patrulla; valor inicial aleatorio para desincronizar enemigos
         self.wander_timer = random.randint(60, 180)
+        # Cantidad de pasos de búsqueda restantes antes de volver a IDLE
+        self.search_steps = 0
 
     def calculate_path(self, target_x, target_y, grid):
         """Convierte coordenadas a índices, corre A* y guarda la ruta en píxeles"""
@@ -423,14 +425,32 @@ class Enemy:
         if self.visibility_timer > 0:
             self.visibility_timer -= 1
 
-        # Patrulla: cuando no hay ruta activa, elige un destino aleatorio cercano
-        if len(self.path) == 0:
-            self.wander_timer -= 1
-            if self.wander_timer <= 0:
-                target_x = self.x + random.randint(-150, 150)
-                target_y = self.y + random.randint(-150, 150)
-                self.calculate_path(target_x, target_y, nav_grid)
-                self.wander_timer = random.randint(120, 240)
+        if self.state == 'IDLE':
+            # Patrulla: cuando no hay ruta activa, elige un destino aleatorio cercano
+            if len(self.path) == 0:
+                self.wander_timer -= 1
+                if self.wander_timer <= 0:
+                    target_x = self.x + random.randint(-150, 150)
+                    target_y = self.y + random.randint(-150, 150)
+                    self.calculate_path(target_x, target_y, nav_grid)
+                    self.wander_timer = random.randint(120, 240)
+
+        elif self.state == 'INVESTIGATING':
+            # Llegó al origen del sonido → inicia exploración local
+            if len(self.path) == 0:
+                self.state = 'SEARCHING'
+                self.search_steps = 3
+
+        elif self.state == 'SEARCHING':
+            if len(self.path) == 0:
+                if self.search_steps > 0:
+                    # Explora un punto aleatorio en radio reducido (merodea la zona)
+                    target_x = self.x + random.randint(-80, 80)
+                    target_y = self.y + random.randint(-80, 80)
+                    self.calculate_path(target_x, target_y, nav_grid)
+                    self.search_steps -= 1
+                else:
+                    self.state = 'IDLE'
 
         # Si tenemos una ruta, nos movemos hacia el primer punto de la lista
         if len(self.path) > 0:
@@ -725,6 +745,7 @@ def main():
                     # Si el borde de la onda toca al enemigo (Con un margen de error)
                     if abs(dist - wave.radius) < 15.0:
                         enemy.calculate_path(wave.x, wave.y, nav_grid)
+                        enemy.state = 'INVESTIGATING'
                         # La onda "ilumina" al enemigo por 3 segundos
                         enemy.visibility_timer = FPS * 3
 
