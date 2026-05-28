@@ -389,6 +389,9 @@ class Enemy:
         self.path = [] # Guarda puntos (X,Y) en píxeles
         self.active = True
 
+        # Frames restantes de visibilidad; el enemigo solo se renderiza cuando este valor > 0
+        self.visibility_timer = 0
+
     def calculate_path(self, target_x, target_y, grid):
         """Convierte coordenadas a índices, corre A* y guarda la ruta en píxeles"""
         # Discretizar --> Convertir píxeles a índices de celda
@@ -413,6 +416,8 @@ class Enemy:
 
     def update(self):
         if not self.active: return
+        if self.visibility_timer > 0:
+            self.visibility_timer -= 1
         # Si tenemos una ruta, nos movemos hacia el primer punto de la lista
         if len(self.path) > 0:
             target_x, target_y = self.path[0]
@@ -434,6 +439,7 @@ class Enemy:
 
     def draw(self, is_player_hunter):
         if not self.active: return
+        if self.visibility_timer <= 0: return
 
         # Si el jugador tiene estrella, el enemigo huye (Cambia de color)
         if is_player_hunter:
@@ -705,6 +711,8 @@ def main():
                     # Si el borde de la onda toca al enemigo (Con un margen de error)
                     if abs(dist - wave.radius) < 15.0:
                         enemy.calculate_path(wave.x, wave.y, nav_grid)
+                        # La onda "ilumina" al enemigo por 3 segundos
+                        enemy.visibility_timer = FPS * 3
 
             # Filtrar ondas que ya no están activas                    
             waves = [w for w in waves if w.active]
