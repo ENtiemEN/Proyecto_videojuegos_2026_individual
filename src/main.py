@@ -306,13 +306,17 @@ def main():
                 wave.draw()
             for enemy in enemies:
                 enemy.draw(player.is_hunter)
-            exit_obj.draw(all_fruits)
+            if exit_obj is not None:
+                exit_obj.draw(all_fruits)
             player.draw()
 
             # HUD
             draw_text(20, HEIGHT - 40, f"SCORE: {player.score}", font_hud, color=(0, 255, 0))
             if player.is_hunter:
                 draw_text(WIDTH//2 - 60, HEIGHT - 40, "MODO CAZADOR", font_hud, (255, 255, 0))
+            if survival_mode:
+                active_count = sum(1 for e in enemies if e.active)
+                draw_text(WIDTH - 230, HEIGHT - 40, f"ENEMIGOS: {active_count}", font_hud, color=(255, 50, 50))
 
         pygame.display.flip()
         clock.tick(FPS)
