@@ -13,6 +13,19 @@ from levels import get_level, MAX_LEVEL
 WIDTH, HEIGHT = 800, 600
 FPS = 60
 
+LEVEL_NAMES = {
+    1: "NIVEL 1 — Tutorial",
+    2: "NIVEL 2 — Primeros depredadores",
+    3: "NIVEL 3 — Caza o muere",
+    4: "NIVEL 4 — Supervivencia",
+}
+LEVEL_OBJECTIVES = {
+    1: "Ecolocaliza con ESPACIO · recoge frutas · llega a la salida",
+    2: "Los enemigos te escuchan · ecolocaliza para revelarlos",
+    3: "Recoge estrellas para poder cazar a los enemigos",
+    4: "Sin salida · acumula la mayor puntuacion posible",
+}
+
 def draw_text(x, y, text, font, color=(255, 255, 255)):
     """Renderiza texto de Pygame y lo dibuja en el contexto de OpenGL como píxeles 2D"""
     text_surface = font.render(text, True, color)
@@ -133,6 +146,7 @@ def main():
     font_title = pygame.font.SysFont("Courier", 72, bold=True)
     font_menu  = pygame.font.SysFont("Courier", 36, bold=True)
     font_hud   = pygame.font.SysFont("Arial",   24, bold=True)
+    font_intro = pygame.font.SysFont("Arial",   20)
 
     MAP_WIDTH, MAP_HEIGHT = 1600, 1200
 
@@ -158,10 +172,11 @@ def main():
     survival_mode       = False
     enemy_spawn_timer    = 0
     enemy_spawn_interval = 0
+    level_intro_timer    = 0
 
     def reset_game():
         nonlocal player, camera, waves, fruits, stars, enemies, walls, nav_grid, exit_obj
-        nonlocal survival_mode, enemy_spawn_timer, enemy_spawn_interval
+        nonlocal survival_mode, enemy_spawn_timer, enemy_spawn_interval, level_intro_timer
         data     = get_level(current_level)
         walls    = data['walls']
         fruits   = data['fruits']
@@ -176,6 +191,7 @@ def main():
         survival_mode = data.get('survival', False)
         enemy_spawn_interval = 1200 if survival_mode else 0
         enemy_spawn_timer    = enemy_spawn_interval
+        level_intro_timer    = FPS * 4
 
     running = True
 
@@ -364,12 +380,28 @@ def main():
             # HUD
             draw_text(20, HEIGHT - 40, f"SCORE: {player.score}", font_hud, color=(0, 255, 0))
             if player.is_hunter:
-                draw_text(WIDTH//2 - 60, HEIGHT - 40, "MODO CAZADOR", font_hud, (255, 255, 0))
+                BAR_W   = 200
+                label   = "MODO CAZADOR"
+                label_w = font_hud.size(label)[0]
+                draw_text(WIDTH//2 - label_w//2, HEIGHT - 40, label, font_hud, (255, 255, 0))
                 fill = player.hunter_timer / (FPS * 10)
-                draw_bar(WIDTH//2 - 100, HEIGHT - 58, 200, 10, fill, (255, 220, 0))
+                draw_bar(WIDTH//2 - BAR_W//2, HEIGHT - 58, BAR_W, 10, fill, (255, 220, 0))
             if survival_mode:
                 active_count = sum(1 for e in enemies if e.active)
                 draw_text(WIDTH - 230, HEIGHT - 40, f"ENEMIGOS: {active_count}", font_hud, color=(255, 50, 50))
+
+            # Intro de nivel: 4 s visibles, último segundo en fade-out
+            if level_intro_timer > 0:
+                level_intro_timer -= 1
+                fade     = min(1.0, level_intro_timer / FPS)
+                c_title  = (0, int(255 * fade), int(255 * fade))
+                c_sub    = (int(180 * fade), int(180 * fade), int(180 * fade))
+                title    = LEVEL_NAMES.get(current_level, "")
+                obj      = LEVEL_OBJECTIVES.get(current_level, "")
+                tw       = font_menu.size(title)[0]
+                ow       = font_intro.size(obj)[0]
+                draw_text(WIDTH//2 - tw//2, HEIGHT//2 + 30, title, font_menu,  c_title)
+                draw_text(WIDTH//2 - ow//2, HEIGHT//2 - 5,  obj,   font_intro, c_sub)
 
         pygame.display.flip()
         clock.tick(FPS)
