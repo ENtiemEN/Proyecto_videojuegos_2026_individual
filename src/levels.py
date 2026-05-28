@@ -1,5 +1,7 @@
 from entities import Wall, Fruit, Star, Enemy, Exit
 
+MAX_LEVEL = 1  # actualizar al agregar cada nuevo nivel
+
 def get_level(n):
     levels = {
         1: level_1,

@@ -6,7 +6,7 @@ import sys
 import math
 
 from entities import Player, SoundWave, Wall, Fruit, Star, Enemy, Camera, Exit, CELL_SIZE
-from levels import get_level
+from levels import get_level, MAX_LEVEL
 
 # Global Config
 WIDTH, HEIGHT = 800, 600
@@ -150,6 +150,7 @@ def main():
                         menu_idx = 1 - menu_idx
                     elif event.key == K_RETURN:
                         if menu_idx == 0:
+                            current_level = 1
                             reset_game()
                             game_started = True
                             state = "PLAYING"
@@ -162,7 +163,12 @@ def main():
 
                 elif state == "WIN":
                     if event.key == K_RETURN:
-                        state = "MENU"
+                        if current_level < MAX_LEVEL:
+                            current_level += 1
+                            reset_game()
+                            state = "PLAYING"
+                        else:
+                            state = "MENU"
 
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
 
