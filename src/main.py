@@ -5,6 +5,43 @@ from OpenGL.GLU import *
 import sys
 import math
 import random
+import time
+import os
+import ctypes
+import ctypes.wintypes
+
+try:
+    import psutil
+    _PSUTIL = True
+except ImportError:
+    _PSUTIL = False
+
+def _get_ram_mb():
+    if _PSUTIL:
+        import psutil as _p
+        return _p.Process(os.getpid()).memory_info().rss / 1024**2
+    try:
+        class _PMC(ctypes.Structure):
+            _fields_ = [
+                ("cb",                         ctypes.wintypes.DWORD),
+                ("PageFaultCount",             ctypes.wintypes.DWORD),
+                ("PeakWorkingSetSize",         ctypes.c_size_t),
+                ("WorkingSetSize",             ctypes.c_size_t),
+                ("QuotaPeakPagedPoolUsage",    ctypes.c_size_t),
+                ("QuotaPagedPoolUsage",        ctypes.c_size_t),
+                ("QuotaPeakNonPagedPoolUsage", ctypes.c_size_t),
+                ("QuotaNonPagedPoolUsage",     ctypes.c_size_t),
+                ("PagefileUsage",              ctypes.c_size_t),
+                ("PeakPagefileUsage",          ctypes.c_size_t),
+            ]
+        pmc = _PMC()
+        pmc.cb = ctypes.sizeof(pmc)
+        handle = ctypes.windll.kernel32.GetCurrentProcess()
+        ctypes.windll.psapi.GetProcessMemoryInfo(
+            handle, ctypes.byref(pmc), ctypes.sizeof(pmc))
+        return pmc.WorkingSetSize / 1024**2
+    except Exception:
+        return -1
 
 from entities import Player, SoundWave, Wall, Fruit, Star, Enemy, Camera, Exit, CELL_SIZE
 from levels import get_level, MAX_LEVEL
@@ -194,8 +231,10 @@ def main():
         level_intro_timer    = FPS * 4
 
     running = True
+    _frame_counter = 0
 
     while running:
+        _frame_start = time.perf_counter()
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
@@ -404,7 +443,13 @@ def main():
                 draw_text(WIDTH//2 - ow//2, HEIGHT//2 - 5,  obj,   font_intro, c_sub)
 
         pygame.display.flip()
+        _render_ms = (time.perf_counter() - _frame_start) * 1000
         clock.tick(FPS)
+        _frame_counter += 1
+        if _frame_counter % 60 == 0:
+            _fps = clock.get_fps()
+            _ram = _get_ram_mb()
+            print(f"FPS: {_fps:.1f} | Render: {_render_ms:.2f}ms | RAM: {_ram:.1f}MB")
 
     pygame.quit()
     sys.exit()
